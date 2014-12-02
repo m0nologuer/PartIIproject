@@ -1,0 +1,9 @@
+==Dependencies==
+jsoncpp
+DevIL
+glut
+glew
+glext
+Open Asset Import Library
+
+
