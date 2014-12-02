@@ -19,6 +19,7 @@ public:
 	void render();
 	bool inside_mesh(aiVector3D position);
 	int loadasset(const char* path);
+	const aiScene* getSceneObject();
 
 	// current rotation angle
 	float angle = 0.f;

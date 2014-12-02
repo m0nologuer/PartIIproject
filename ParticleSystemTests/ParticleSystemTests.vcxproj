@@ -43,7 +43,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <OutDir>$(SolutionDir)$(Configuration)/</OutDir>
+    <OutDir>$(SolutionDir)/bin/$(Configuration)/</OutDir>
     <IntDir>$(Configuration)/</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -54,15 +54,15 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(VCInstallDir)UnitTest\include;..\;..\..\glext\include;..\..\glew\include;..\..\glut;..\..\..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(VCInstallDir)UnitTest\include;..\;..\..\glext\include;..\..\glew\include;..\..\glut;..\..\..\include;..\jsoncpp-master\include;..\..\assimp\include;..\..\jsoncpp-master\include;..\..\DevIL\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <UseFullPaths>true</UseFullPaths>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(VCInstallDir)UnitTest\lib;..\..\glut;..\output\${Configuration};..\..\glext\lib;..\..\..\lib\assimp_debug-dll_win32;..\..\..\bin\debug\;..\..\..\lib\Debug;..\..\glew\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ParticleContainer.obj;glut32.lib;assimpd.lib;glext.lib;glew32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(VCInstallDir)UnitTest\lib;..\..\glut;..\misc\Debug;..\..\glext\lib;..\..\glew\lib;..\jsoncpp-master\lib\Debug;..\..\assimp\bin\Debug;..\..\assimp\lib\Debug;..\..\jsoncpp-master\lib;..\..\DevIL\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ParticleContainer.obj;GlobalSettings.obj;COLLADALoader.obj;glut32.lib;assimpd.lib;glext.lib;glew32.lib;jsoncpp.lib;DevIL.lib;ILU.lib;ILUT.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -87,8 +87,10 @@
   <ItemGroup>
     <ClInclude Include="..\..\util\shader.hpp" />
     <ClInclude Include="..\..\util\texture.hpp" />
+    <ClInclude Include="MeshAdjacancyGraph.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="UtilMisc.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\util\shader.cpp">
@@ -97,6 +99,7 @@
     <ClCompile Include="..\..\util\texture.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="MeshAdjacancyGraph.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>

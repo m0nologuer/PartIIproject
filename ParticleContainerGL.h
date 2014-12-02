@@ -1,6 +1,6 @@
 #include "ParticleContainer.h"
-#include "../util/shader.hpp"
-#include "../util/texture.hpp"
+#include "util/shader.hpp"
+#include "util/texture.hpp"
 
 void ParticleContainer::Init(char* texture, char* vertexShader, char* pixelShader)
 {

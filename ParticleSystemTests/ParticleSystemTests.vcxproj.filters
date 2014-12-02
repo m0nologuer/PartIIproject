@@ -30,6 +30,12 @@
     <ClInclude Include="..\..\util\texture.hpp">
       <Filter>Util</Filter>
     </ClInclude>
+    <ClInclude Include="MeshAdjacancyGraph.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="UtilMisc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -43,6 +49,9 @@
     </ClCompile>
     <ClCompile Include="..\..\util\texture.cpp">
       <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="MeshAdjacancyGraph.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

@@ -18,10 +18,12 @@
 
 #include "COLLADALoader.h"
 #include "ParticleContainer.h"
+#include "GlobalSettings.h"
 
 ColladaLoader c_loader;
 ParticleContainer p_container;
- 
+GlobalSettings settings;
+
 GLuint scene_list;
 
 static int max_particle_count = 2000;
@@ -78,10 +80,7 @@ void display(void)
 	if (scene_list == 0) {
 		scene_list = glGenLists(1);
 		glNewList(scene_list, GL_COMPILE);
-		// now begin at the root node of the imported data and traverse
-		// the scenegraph by multiplying subsequent local transforms
-		// together on GL's matrix stack.
-		c_loader.render();
+		c_loader.render(); //render
 		glEndList();
 	}
 
@@ -120,15 +119,17 @@ int main(int argc, char **argv)
 	glutDisplayFunc(display);
 	glutReshapeFunc(reshape);
 
-	// the model name can be specified on the command line. If none
-	// is specified, we try to locate one of the more expressive test 
-	// models from the repository (/models-nonbsd may be missing in 
-	// some distributions so we need a fallback from /models!).
-	if (0 != c_loader.loadasset(argc >= 2 ? argv[1] : "../../test/models-nonbsd/X/dwarf.x")) {
-		if (argc != 1 || (0 != c_loader.loadasset("../../../../test/models-nonbsd/X/dwarf.x") && 0 != c_loader.loadasset("../../test/models/X/Testwuson.X"))) {
-			return -1;
-		}
-	}
+	//load settings
+	bool settings_loaded;
+	if (argc >= 2)
+		settings_loaded = settings.LoadFromJson(argv[1]);
+	else
+		settings_loaded = settings.LoadFromJson("../../assets/settings.json");
+	if (!settings_loaded) { return 1; };
+
+	// the model name can be specified in the settings.
+	char* model_name = settings.getAssetLocation("model_name");
+	c_loader.loadasset(model_name);
 
 
 	glClearColor(0.1f,0.1f,0.1f,1.f);
@@ -151,7 +152,9 @@ int main(int argc, char **argv)
 	if (glewInit() != 0)
 		return 1;
 
-	p_container.Init("particle.DDS", "Particle.vertexshader", "Particle.fragmentshader");
+	p_container.Init(settings.getAssetLocation("particle_image"),
+		settings.getAssetLocation("vertex_shader"),
+		settings.getAssetLocation("pixel_shader"));
 
 	glutGet(GLUT_ELAPSED_TIME);
 	glutMainLoop();

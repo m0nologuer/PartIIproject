@@ -11,6 +11,15 @@ ParticleContainer::ParticleContainer()
 		container[i].life = -1; //initalize all particles dead
 	}
 	average_speed = 0;
+
+	Wq = W_poly6(Particle::vec3(q,0,0));
+	h = 0.1; //distance paramter
+	e0 = 0.01; //relaxion parameter
+
+	//for the correction 
+	corr_k = 0.1;
+	q = 0.1*h;
+	p0 = 0.5; //rest desngity
 }
 ParticleContainer::~ParticleContainer()
 {
@@ -54,10 +63,10 @@ void ParticleContainer::addNewParticles(double delta)
 
 		//starting speed and position
 		double theta = (rand() % 628)*0.01;
-		double phi = 1.7;
+		double phi = (rand() % 314)*0.01;
 
-		p.pos = Particle::vec3(sin(phi)*cos(theta), cos(phi)+5, sin(phi)*sin(theta))*0.1;
-		p.speed = Particle::vec3(rand() % 10 - 5, 100 + rand() % 50, rand() % 10 - 5)*-1;
+		p.pos = Particle::vec3(sin(phi)*cos(theta), cos(phi), sin(phi)*sin(theta))*0.1;
+		p.speed = Particle::vec3(0,1,0)*50;
 		p.life = 5.0f; //lasts 5 seconds
 
 		//setting misc parameters randomly for now
@@ -139,7 +148,13 @@ Particle::vec3 ParticleContainer::collisionUpdate(int index)
 	Particle::vec3 sum(0,0,0);
 	for (it = neighbours[index].begin(); it < neighbours[index].end(); it++) {
 		Particle pj = container[(*it)];
-		sum = sum + dW_poly6(pi.predicted_pos - pj.predicted_pos)*(pi.lambda+pj.lambda);
+
+		//calculate correction
+		double s_corr = W_poly6(pi.predicted_pos - pj.predicted_pos)/Wq;
+		s_corr = - corr_k * pow(s_corr, n);
+
+		//add contribution
+		sum = sum + dW_spiky(pi.predicted_pos - pj.predicted_pos)*(pi.lambda + pj.lambda + s_corr);
 	}
 	//scaled sum
 	return sum *(1 / p0);
@@ -199,7 +214,16 @@ double ParticleContainer::lambda(int index)
 }
 double ParticleContainer::W_spiky(Particle::vec3 r)
 {
-	return 0;
+	double radius = r.x*r.x + r.y*r.y + r.z*r.z;
+
+	if (radius < h_squared)
+	{
+		//constant is 15/pi
+		double result = pow(h - sqrt(radius), 3.0) * 4.77464829 / h_6;
+		return result;
+	}
+	else //ignore particles outside a certain large radius
+		return 0;
 }
 double ParticleContainer::W_poly6(Particle::vec3 r){
 
@@ -216,7 +240,17 @@ double ParticleContainer::W_poly6(Particle::vec3 r){
 }
 Particle::vec3 ParticleContainer::dW_spiky(Particle::vec3 r){
 
-	return Particle::vec3(0,0,0);
+	double radius = r.x*r.x + r.y*r.y + r.z*r.z;
+
+	if (radius < h_squared)
+	{
+		//constant is 15/pi
+		double result = - 3 * pow(h - sqrt(radius), 2.0) * 4.77464829 / h_6;
+		Particle::vec3 grad = r * result;
+		return grad;
+	}
+	else //ignore particles outside a certain large radius
+		return Particle::vec3(0, 0, 0);
 }
 Particle::vec3 ParticleContainer::dW_poly6(Particle::vec3 r){
 
@@ -226,7 +260,7 @@ Particle::vec3 ParticleContainer::dW_poly6(Particle::vec3 r){
 	{
 		//constant is 315/64pi
 		double radius = sqrt(radius_2);
-		double result = -6 * pow(h_squared - radius_2, 2.0) * 1.56668147 / h_9;
+		double result = -6 * radius * pow(h_squared - radius_2, 2.0) * 1.56668147 / h_9;
 		Particle::vec3 grad = r * result;
 		return grad;
 	}
@@ -237,10 +271,7 @@ Particle::vec3 ParticleContainer::dW_poly6(Particle::vec3 r){
 Particle::vec3 ParticleContainer::getParticleForce(Particle::vec3 pos)
 { 
 	// Simulate simple physics : gravity only, no collisions
-	if (pos.x > -0.05)
 		return Particle::vec3(0, -9.81, 0);
-	else
-		return Particle::vec3(0, 900.81, 0);
 }
 vector<int> ParticleContainer::findNeighbouringParticles(Particle postion)
 {

@@ -7,6 +7,11 @@ ColladaLoader::~ColladaLoader(){
 	aiReleaseImport(scene);
 
 }
+const aiScene* ColladaLoader::getSceneObject()
+{
+	return scene;
+}
+
 // ----------------------------------------------------------------------------
 void ColladaLoader::get_bounding_box_for_node(const aiNode* nd,
 	aiVector3D* min,

@@ -56,18 +56,25 @@ struct Particle{
 	double life; // Remaining life of the particle. if < 0 : dead and unused.
 	double cameradistance; //for sorting
 };
-
-#define p0 0.5
-#define h 0.1
 #define h_squared (h*h)
+#define h_6 (h_squared*h_squared*h_squared)
 #define h_9 (h_squared*h_squared*h_squared*h_squared*h)
-#define e0 0.01
+
 
 class ParticleContainer
 {
 
 public:
+	//constants
 	static const int max_particle_count = 2000;
+	static const int n = 4;
+
+	float Wq;
+	float h;
+	float corr_k;
+	float q;
+	float e0;
+	float p0;
 
 	//pointers to GL buffers
 	GLuint particles_color_buffer;
@@ -86,7 +93,7 @@ public:
 
 private:
 	static const int particles_per_second = 40;
-	static const int iteration_count = 15;
+	static const int iteration_count = 45;
 
 	Particle container[max_particle_count];
 
