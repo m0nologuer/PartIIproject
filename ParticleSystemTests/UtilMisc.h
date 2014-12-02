@@ -48,7 +48,6 @@ void save_screenshot(int width, int height, wchar_t* filename)
 		ilCopyPixels(0, 0, 0, width, height, 1, IL_RGB, IL_BYTE, raw_img);
 
 		ILboolean error_code = ilSaveImage(filename);
-
 		Assert::IsTrue(error_code = IL_TRUE);
 
 		ilDeleteImages(1, &ImgId);

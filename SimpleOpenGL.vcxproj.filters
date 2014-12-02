@@ -1,0 +1,64 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="ParticleContainer.cpp">
+      <Filter>Particles</Filter>
+    </ClCompile>
+    <ClCompile Include="ColladaLoader.cpp">
+      <Filter>Utilities</Filter>
+    </ClCompile>
+    <ClCompile Include="GlobalSettings.cpp">
+      <Filter>Utilities</Filter>
+    </ClCompile>
+    <ClCompile Include="util\shader.cpp">
+      <Filter>Utilities</Filter>
+    </ClCompile>
+    <ClCompile Include="util\texture.cpp">
+      <Filter>Utilities</Filter>
+    </ClCompile>
+    <ClCompile Include="KDTree.cpp">
+      <Filter>Particles</Filter>
+    </ClCompile>
+    <ClCompile Include="ParticleComputation.cpp">
+      <Filter>Particles</Filter>
+    </ClCompile>
+    <ClCompile Include="ParticleGL.cpp">
+      <Filter>Particles</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ParticleContainer.h">
+      <Filter>Particles</Filter>
+    </ClInclude>
+    <ClInclude Include="GlobalSettings.h">
+      <Filter>Utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="COLLADALoader.h">
+      <Filter>Utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="util\shader.hpp">
+      <Filter>Utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="util\texture.hpp">
+      <Filter>Utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="KDTree.h">
+      <Filter>Particles</Filter>
+    </ClInclude>
+    <ClInclude Include="ParticleKernels.h">
+      <Filter>Particles</Filter>
+    </ClInclude>
+    <ClInclude Include="Particle.h">
+      <Filter>Particles</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Utilities">
+      <UniqueIdentifier>{73586489-e47f-4783-ad58-7a7b64380c11}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Particles">
+      <UniqueIdentifier>{50ec4d66-26c6-4194-9744-7c089bcc9d24}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

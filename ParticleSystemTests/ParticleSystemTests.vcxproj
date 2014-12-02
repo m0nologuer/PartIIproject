@@ -62,7 +62,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(VCInstallDir)UnitTest\lib;..\..\glut;..\misc\Debug;..\..\glext\lib;..\..\glew\lib;..\jsoncpp-master\lib\Debug;..\..\assimp\bin\Debug;..\..\assimp\lib\Debug;..\..\jsoncpp-master\lib;..\..\DevIL\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ParticleContainer.obj;GlobalSettings.obj;COLLADALoader.obj;glut32.lib;assimpd.lib;glext.lib;glew32.lib;jsoncpp.lib;DevIL.lib;ILU.lib;ILUT.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ParticleContainer.obj;ParticleGL.obj;ParticleComputation.obj;GlobalSettings.obj;COLLADALoader.obj;KDTree.obj;glut32.lib;assimpd.lib;glext.lib;glew32.lib;jsoncpp.lib;DevIL.lib;ILU.lib;ILUT.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -85,18 +85,18 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\util\shader.hpp" />
-    <ClInclude Include="..\..\util\texture.hpp" />
+    <ClInclude Include="..\util\shader.hpp" />
+    <ClInclude Include="..\util\texture.hpp" />
     <ClInclude Include="MeshAdjacancyGraph.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="UtilMisc.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\util\shader.cpp">
+    <ClCompile Include="..\util\shader.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\util\texture.cpp">
+    <ClCompile Include="..\util\texture.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="MeshAdjacancyGraph.cpp" />

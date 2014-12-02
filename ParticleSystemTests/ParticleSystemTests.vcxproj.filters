@@ -24,17 +24,17 @@
     <ClInclude Include="targetver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\util\shader.hpp">
-      <Filter>Util</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\util\texture.hpp">
-      <Filter>Util</Filter>
-    </ClInclude>
     <ClInclude Include="MeshAdjacancyGraph.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="UtilMisc.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\shader.hpp">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\texture.hpp">
+      <Filter>Util</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -44,14 +44,14 @@
     <ClCompile Include="unittest1.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\util\shader.cpp">
-      <Filter>Util</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\util\texture.cpp">
-      <Filter>Util</Filter>
-    </ClCompile>
     <ClCompile Include="MeshAdjacancyGraph.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\shader.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\texture.cpp">
+      <Filter>Util</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

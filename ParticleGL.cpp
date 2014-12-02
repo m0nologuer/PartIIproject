@@ -12,7 +12,7 @@ void ParticleContainer::Init(char* texture, char* vertexShader, char* pixelShade
 	//load textures and shaders
 	programID = LoadShaders(vertexShader, pixelShader);
 	textureID = glGetUniformLocation(programID, "myTextureSampler");
-	viewVec1ID =  glGetUniformLocation(programID, "CameraRight_worldspace");
+	viewVec1ID = glGetUniformLocation(programID, "CameraRight_worldspace");
 	viewVec2ID = glGetUniformLocation(programID, "CameraUp_worldspace");
 	vpMatID = glGetUniformLocation(programID, "Proj");
 	billboardTextureID = loadDDS(texture);

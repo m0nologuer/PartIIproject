@@ -107,16 +107,21 @@ copy ..\..\bin\assimp_release-dll_Win32\Assimp32.dll ..\bin
   <ItemGroup>
     <ClCompile Include="ColladaLoader.cpp" />
     <ClCompile Include="GlobalSettings.cpp" />
+    <ClCompile Include="KDTree.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="ParticleComputation.cpp" />
     <ClCompile Include="ParticleContainer.cpp" />
+    <ClCompile Include="ParticleGL.cpp" />
     <ClCompile Include="util\shader.cpp" />
     <ClCompile Include="util\texture.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="COLLADALoader.h" />
     <ClInclude Include="GlobalSettings.h" />
+    <ClInclude Include="KDTree.h" />
+    <ClInclude Include="Particle.h" />
     <ClInclude Include="ParticleContainer.h" />
-    <ClInclude Include="ParticleContainerGL.h" />
+    <ClInclude Include="ParticleKernels.h" />
     <ClInclude Include="util\shader.hpp" />
     <ClInclude Include="util\texture.hpp" />
   </ItemGroup>

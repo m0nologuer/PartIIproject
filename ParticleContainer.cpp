@@ -1,5 +1,4 @@
 #include "ParticleContainer.h"
-#include "ParticleContainerGL.h"
 
 #include <stdio.h>
 
@@ -24,14 +23,12 @@ ParticleContainer::ParticleContainer()
 ParticleContainer::~ParticleContainer()
 {
 }
-
 int ParticleContainer::getParticleCount(){
 	return render_counter;
 }
 double ParticleContainer::getAverageSpeed(){
 	return average_speed;
 }
-
 int ParticleContainer::getUnusedParticle(){
 
 	for (int i = last_particle_count; i< max_particle_count; i++){
@@ -86,207 +83,6 @@ void ParticleContainer::addNewParticles(double delta)
 		last_particle_count = index;
 	}
 } 
-void ParticleContainer::applyPhysics(double delta)
-{
-	delta = delta * 0.001;
-
-	//update data structure
-	for (int i = 0; i < max_particle_count; i++){
-		Particle& p = container[i]; // shortcut
-
-		//if particle is alive
-		if (p.life > 0.0f){
-
-			//update  speed and position
-			p.speed = p.speed + getParticleForce(p.pos) * (double)delta;
-			p.predicted_pos = p.pos + p.speed * (double)delta;
-			
-			//find neighbouring particles
-			neighbours[i] = findNeighbouringParticles(p);
-		}
-	}
-
-	//Perform collision detection, solving
-	for (int i = 0; i < iteration_count; i++)
-		solverIteration();
-
-	//Update particle info
-	for (int i = 0; i < max_particle_count; i++){
-		container[i].speed = (container[i].predicted_pos - container[i].pos * 1.0) *(1 / delta);
-		container[i].pos = container[i].predicted_pos;
-	}
-}
-void ParticleContainer::solverIteration()
-{
-	//calculate lambdas
-	for (int i = 0; i < max_particle_count; i++){
-		Particle& p = container[i]; // shortcut
-		if (p.life > 0.0f){
-			p.lambda = lambda(i);
-		}
-	}
-	
-	//perform collision detection & adjustment
-	for (int i = 0; i < max_particle_count; i++){
-		Particle& p = container[i]; // shortcut
-		if (p.life > 0.0f){
-			p.d_p_pos = collisionUpdate(i);
-		}
-	}
-
-	for (int i = 0; i < max_particle_count; i++){
-		container[i].predicted_pos = container[i].predicted_pos + container[i].d_p_pos;
-	}
-
-}
-Particle::vec3 ParticleContainer::collisionUpdate(int index)
-{
-	Particle pi = container[index];
-
-	//iterate over neighbours
-	vector<int>::iterator it;
-	Particle::vec3 sum(0,0,0);
-	for (it = neighbours[index].begin(); it < neighbours[index].end(); it++) {
-		Particle pj = container[(*it)];
-
-		//calculate correction
-		double s_corr = W_poly6(pi.predicted_pos - pj.predicted_pos)/Wq;
-		s_corr = - corr_k * pow(s_corr, n);
-
-		//add contribution
-		sum = sum + dW_spiky(pi.predicted_pos - pj.predicted_pos)*(pi.lambda + pj.lambda + s_corr);
-	}
-	//scaled sum
-	return sum *(1 / p0);
-}
-double ParticleContainer::constraint_function(int index){
-
-	Particle pi = container[index];
-	
-	//iterate over all neighbours
-	vector<int>::iterator it;
-	double sum = 0;
-	for (it = neighbours[index].begin(); it < neighbours[index].end(); it++) {
-		Particle pj = container[(*it)];
-		//smoothing kernel
-		sum += W_poly6(pi.predicted_pos - pj.predicted_pos);
-	}
-
-	double Ci = sum / p0 - 1;
-
-	return Ci;
-}
-double ParticleContainer::gradient_constraint_function(int i, int k){
-	Particle pi = container[i];
-
-	if (i == k) //differentiating the above function
-	{ 
-		vector<int>::iterator it;
-		double sum = 0;
-		for (it = neighbours[i].begin(); it < neighbours[i].end(); it++) {
-			Particle pj = container[(*it)];
-			//taking gradient of scalar field, dot with d(pk)/dt
-			sum += Particle::vec3::dot(dW_poly6(pi.predicted_pos - pj.predicted_pos), pj.speed);
-		}
-		return sum / p0;
-	}
-	else
-	{
-		Particle pj = container[k];
-		double result = -Particle::vec3::dot(dW_poly6(pi.predicted_pos - pj.predicted_pos), pj.speed);
-
-		return result / p0;
-	}
-}
-double ParticleContainer::lambda(int index)
-{
-	Particle pi = container[index];
-
-	double numerator = constraint_function(index);
-
-	vector<int>::iterator it;
-	double denomninator = e0;
-	for (it = neighbours[index].begin(); it < neighbours[index].end(); it++) {
-		denomninator += pow(gradient_constraint_function(index, (*it)), 2.0);
-	}
-
-	return -numerator / denomninator;
-}
-double ParticleContainer::W_spiky(Particle::vec3 r)
-{
-	double radius = r.x*r.x + r.y*r.y + r.z*r.z;
-
-	if (radius < h_squared)
-	{
-		//constant is 15/pi
-		double result = pow(h - sqrt(radius), 3.0) * 4.77464829 / h_6;
-		return result;
-	}
-	else //ignore particles outside a certain large radius
-		return 0;
-}
-double ParticleContainer::W_poly6(Particle::vec3 r){
-
-	double radius = r.x*r.x + r.y*r.y + r.z*r.z;
-
-	if (radius < h_squared)
-	{
-		//constant is 315/64pi
-		double result = pow(h_squared - radius, 3.0) * 1.56668147 / h_9; 
-		return result;
-	}
-	else //ignore particles outside a certain large radius
-		return 0;
-}
-Particle::vec3 ParticleContainer::dW_spiky(Particle::vec3 r){
-
-	double radius = r.x*r.x + r.y*r.y + r.z*r.z;
-
-	if (radius < h_squared)
-	{
-		//constant is 15/pi
-		double result = - 3 * pow(h - sqrt(radius), 2.0) * 4.77464829 / h_6;
-		Particle::vec3 grad = r * result;
-		return grad;
-	}
-	else //ignore particles outside a certain large radius
-		return Particle::vec3(0, 0, 0);
-}
-Particle::vec3 ParticleContainer::dW_poly6(Particle::vec3 r){
-
-	double radius_2 = r.x*r.x + r.y*r.y + r.z*r.z;
-
-	if (radius_2 < h_squared)
-	{
-		//constant is 315/64pi
-		double radius = sqrt(radius_2);
-		double result = -6 * radius * pow(h_squared - radius_2, 2.0) * 1.56668147 / h_9;
-		Particle::vec3 grad = r * result;
-		return grad;
-	}
-	else //ignore particles outside a certain large radius
-		return Particle::vec3(0,0,0);
-}
-
-Particle::vec3 ParticleContainer::getParticleForce(Particle::vec3 pos)
-{ 
-	// Simulate simple physics : gravity only, no collisions
-		return Particle::vec3(0, -9.81, 0);
-}
-vector<int> ParticleContainer::findNeighbouringParticles(Particle postion)
-{
-	vector<int> neighbours;
-	for (int i = 0; i < max_particle_count; i++){
-		if (container[i].life > 0.0f){
-			Particle::vec3 direction = postion.pos - container[i].pos;
-			double distance = Particle::vec3::dot(direction, direction);
-			if (distance < h_squared)
-				neighbours.push_back(i);
-		}
-	}
-	return neighbours;
-}  
-
 void ParticleContainer::UpdateParticles(double delta)
 {	
 	addNewParticles(delta); 
