@@ -18,53 +18,6 @@ namespace ParticleSystemTests
 	TEST_CLASS(UnitTest1)
 	{
 	public:
-		TEST_METHOD(BenchmarkKDTree)
-		{
-			//benchmark boilerplate
-			double argv[2];
-			int argc = 2;
-			int table_size = 50;
-			std::string written_output = "particles, radius, timer \n";
-
-			for (int run = 0; run < table_size; run++)
-			{
-				//set up variables for this iteration
-				argv[0] = 500 * (run % 10 + 1);
-				argv[1] = (run / 10 + 1) * 10;
-
-				int dummy_count = (int)argv[0];
-				double r = argv[1];
-
-				//gnerate dummy particles
-				Particle* dummy_particles = new Particle[dummy_count];
-				for (int i = 0; i < dummy_count; i++)
-				{
-					dummy_particles[i].pos = Particle::vec3(rand() % 100,
-						rand() % 100, rand() % 100);
-					dummy_particles[i].life = 1;
-				}
-				//start timer
-				auto start_time = std::chrono::high_resolution_clock::now();
-
-				//build tree
-				KDTree tree(dummy_particles, dummy_count);
-				//find all particles with a distance of 20
-				tree.findNeighbouringParticles(dummy_particles[0], 50);
-
-				//record time elapsed
-				auto end_time = std::chrono::high_resolution_clock::now();
-				auto elapsed = end_time - start_time;
-				int time = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
-
-				written_output += benchmark_result_format(argv, argc, time);
-			}
-
-			//write output
-			std::string filename = make_filename("../../output/reports/KD_benchmark/", "simple_timer",
-				 "csv");
-			writeFile(filename, written_output);
-
-		}
 		TEST_METHOD(GenerateGifWithSettings)
 		{
 			ColladaLoader c_loader;
@@ -99,9 +52,37 @@ namespace ParticleSystemTests
 				settings.getAssetLocation("vertex_shader"),
 				settings.getAssetLocation("pixel_shader"));
 		
+			GLuint colorTex, depthTex, fbo;
+			// create a RGBA color texture
+			glGenTextures(1, &colorTex);
+			glBindTexture(GL_TEXTURE_2D, colorTex);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+				1024, 768,
+				0, GL_RGBA, GL_UNSIGNED_BYTE,
+				NULL);
+
+			// create a depth texture
+			glGenTextures(1, &depthTex);
+			glBindTexture(GL_TEXTURE_2D, depthTex);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
+				1024, 768,
+				0, GL_DEPTH_COMPONENT, GL_FLOAT,
+				NULL);
+
+			// create the framebuffer object
+			glGenFramebuffers(1, &fbo);
+			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
+
+			// attach color
+			glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, colorTex, 0);
+			glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, depthTex, 0);
+
 			int FRAME_COUNT = 30; //number of frames in gif
 			for (int i = 0; i < FRAME_COUNT; i++)
 			{
+				// bind the framebuffer as the output framebuffer
+				glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
+
 				c_loader.angle += 0.01;
 				p_container.UpdateParticles(0.1); //convert ms to s
 
@@ -130,10 +111,11 @@ namespace ParticleSystemTests
 
 				p_container.Draw();
 
-				std::string str = make_filename("../../output/images/simple_screencap",
-					"frame","png");
-				std::wstring widestr = std::wstring(str.begin(), str.end());
-				save_screenshot(1024, 768, (wchar_t*)widestr.c_str());
+				// bind the framebuffer as the output framebuffer
+				std::string str = make_filename("../../output/images/simple_screencap/",
+					"frame","tga");
+				save_screenshot(1024, 768, (char*)str.c_str());
+			//	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 			}
 		}
 		TEST_METHOD(Test3DModelValid)
@@ -169,31 +151,6 @@ namespace ParticleSystemTests
 				Assert::IsTrue(graph.vertexFanProperty());
 			}
 
-
-		}
-		TEST_METHOD(TestParticleSystemAccuracy)
-		{
-			GLInitTesting();
-
-			ParticleContainer p_container;
-			GlobalSettings settings;
-
-			//Load 3D model
-			Assert::IsTrue(settings.LoadFromJson("../../assets/settings.json"));
-			//Initialize container
-			p_container.Init(settings.getAssetLocation("particle_image"),
-				settings.getAssetLocation("vertex_shader"),
-				settings.getAssetLocation("pixel_shader"));
-
-			int test_frame_count = 100;
-			for (int i = 0; i < test_frame_count; i++)
-			{
-				p_container.UpdateParticles(0.02);
-				std::string output;// = p_container.livePositionsList;
-				std::string filename = make_filename("../../output/reports/particle_positions",
-					"simple_timer","txt");
-				writeFile(filename, output);
-			}
 
 		}
 		TEST_METHOD(TestParticleGLIntegration)

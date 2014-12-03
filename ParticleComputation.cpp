@@ -8,8 +8,6 @@
 
 void ParticleContainer::applyPhysics(double delta)
 {
-	delta = delta * 0.001;
-
 #ifdef USE_KDTREE
 	//start by building the k-D tree
 	KDTree tree(container, max_particle_count);

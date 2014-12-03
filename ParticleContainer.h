@@ -34,8 +34,10 @@ public:
 	void UpdateParticles(double delta);
 	void Draw();
 
+	//information getters
 	int getParticleCount();
 	double getAverageSpeed();
+	std::string livePositionsList();
 private:
 	static const int particles_per_second = 40;
 	static const int iteration_count = 45;

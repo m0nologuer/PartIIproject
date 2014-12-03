@@ -19,6 +19,9 @@ ParticleContainer::ParticleContainer()
 	corr_k = 0.1;
 	q = 0.1*h;
 	p0 = 0.5; //rest desngity
+
+	particles_color_buffer = NULL;
+	particles_position_buffer = NULL;
 }
 ParticleContainer::~ParticleContainer()
 {
@@ -28,6 +31,20 @@ int ParticleContainer::getParticleCount(){
 }
 double ParticleContainer::getAverageSpeed(){
 	return average_speed;
+}
+std::string ParticleContainer::livePositionsList()
+{
+	std::string output = "x,y,z\n";
+	//create a list ofpositions of live particles
+	for (int i = 0; i < max_particle_count; i++)
+		if (container[i].life > 0)
+		{
+			char buffer[512];
+			Particle::vec3 p = container[i].pos;
+			sprintf((char*)buffer, "%f, %f, %f \n", p.x, p.y, p.z);
+			output += buffer;
+		}
+	return output;
 }
 int ParticleContainer::getUnusedParticle(){
 

@@ -53,5 +53,14 @@
     <ClCompile Include="..\util\texture.cpp">
       <Filter>Util</Filter>
     </ClCompile>
+    <ClCompile Include="benchmarks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="TestUtil.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ParticleSystemAccuracy.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
