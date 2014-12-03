@@ -1,6 +1,5 @@
 #include "KDTree.h"
 #include <algorithm>
-#include <deque>
 
 bool KDTree::Comparator::operator() (Particle* a, Particle* b)
 {
@@ -16,7 +15,27 @@ bool KDTree::Comparator::operator() (Particle* a, Particle* b)
 	}
 	return greater;
 }
+KDTree::KDTree(Particle* particle_container, int particle_count)
+{
+	//only count alive particles
+	std::vector<Particle*> particles;
+	for (int i = 0; i < particle_count; i++)
+		if (particle_container[i].life > 0)
+			particles.push_back(&(particle_container[i]));
+	
+	//unrolled recursive process to stop stack overflow
+	root_node = new KDTree::Node();
+	KDTreeArgs tree_args(&particles, Axis::X_AXIS, root_node);
+	build_deque.push_back(tree_args);
+	//build the tree
+	while (!build_deque.empty())
+	{
+		KDTreeArgs next_tree_args = build_deque.front();
+		buildNode(next_tree_args.particles, next_tree_args.a, next_tree_args.node);
+		build_deque.pop_front();
+	}
 
+}
 Particle* KDTree::findMedian(std::vector<Particle*> particles, KDTree::Axis a)
 {
 	int half_n = particles.size() / 2;
@@ -25,14 +44,10 @@ Particle* KDTree::findMedian(std::vector<Particle*> particles, KDTree::Axis a)
 		comp);
 	return particles[half_n];
 }
-KDTree::Node* KDTree::buildNode(std::vector<Particle*> particles, KDTree::Axis a)
+void KDTree::buildNode(std::vector<Particle*>* particles, KDTree::Axis a, KDTree::Node* node)
 {
-	if (particles.empty())
-		return NULL;
-
 	//create new node
-	KDTree::Node* node = new KDTree::Node;
-	Particle* median_p = findMedian(particles, a); //find hyperplane
+	Particle* median_p = findMedian(*particles, a); //find hyperplane
 	node->p = median_p;
 	node->left = NULL;
 	node->right = NULL;
@@ -40,23 +55,32 @@ KDTree::Node* KDTree::buildNode(std::vector<Particle*> particles, KDTree::Axis a
 	comp.ax = a; //set compatator
 
 	//sort particles across hyperplane
-	std::vector<Particle*> left, right;
-	for (size_t i = 0; i < particles.size(); i++)
-	{
-		if (comp(particles[i], median_p))
-			right.push_back(particles[i]);
-		else
-			left.push_back(particles[i]);
-	}
+	std::vector<Particle*>* left = new std::vector<Particle*>();
+	std::vector<Particle*>* right = new std::vector<Particle*>();
+	
+	for (size_t i = 0; i < particles->size(); i++)
+		if ((*particles)[i] != median_p) //make sure to not sort the median element
+		{
+			if (comp((*particles)[i], median_p))
+				right->push_back((*particles)[i]);
+			else
+				left->push_back((*particles)[i]);
+		}
 
 	//recursively build nodes
 	KDTree::Axis next_a = (KDTree::Axis)(((int)a + 1) % 3);
-	if (!left.empty())
-		node->left = buildNode(left, next_a);
-	if (!right.empty())
-		node->right = buildNode(right, next_a);
-
-	return node;
+	if (!left->empty())
+	{
+		node->left = new KDTree::Node();
+		KDTreeArgs tree_args(left, next_a, node->left);
+		build_deque.push_back(tree_args);
+	}
+	if (!right->empty())
+	{
+		node->right = new KDTree::Node();
+		KDTreeArgs tree_args(right, next_a, node->right);
+		build_deque.push_back(tree_args);
+	}
 }
 void KDTree::findNeighbouringParticles(Node* n, Particle p, 
 	std::vector<Particle*>& list, double rad)
@@ -69,9 +93,9 @@ void KDTree::findNeighbouringParticles(Node* n, Particle p,
 		list.push_back(n->p);
 		//then consider nodes on both sides
 		if (n->left)
-			findNeighbouringParticles(n->left, p, list, rad);
+			traversal_deque.push_back(n->left);
 		if (n->right)
-			findNeighbouringParticles(n->right, p, list, rad);
+			traversal_deque.push_back(n->right);
 	}
 	else
 	{
@@ -81,23 +105,29 @@ void KDTree::findNeighbouringParticles(Node* n, Particle p,
 
 		//recursively check the structure for the right particles
 		if (!right && n->left)
-			findNeighbouringParticles(n->left, p, list, rad);
+			traversal_deque.push_back(n->left);
 		if (right && n->right)
-			findNeighbouringParticles(n->right, p, list, rad);
+			traversal_deque.push_back(n->right);
 
 	}
 }
 std::vector<Particle*> KDTree::findNeighbouringParticles(Particle p, double rad)
 {
 	std::vector<Particle*> empty_list;
-	if (root_node)
-		KDTree::findNeighbouringParticles(root_node, p, empty_list, rad);
+	if (!(root_node && traversal_deque.empty())) //made sure tree is built and deque free
+		return empty_list;
+	
+	rad = rad*rad; //to save squaing every time
+
+	//unrolled for stack reasons
+	traversal_deque.push_back(root_node);
+	while (!traversal_deque.empty())
+	{
+		Node* next_node = traversal_deque.front();
+		KDTree::findNeighbouringParticles(next_node, p, empty_list, rad);
+		traversal_deque.pop_front();
+	}
 	return empty_list;
-}
-KDTree::KDTree(Particle* particle_container, int particle_count)
-{
-	std::vector<Particle*> particles;
-	root_node = buildNode(particles, Axis::X_AXIS);
 }
 KDTree::~KDTree()
 {
@@ -111,14 +141,16 @@ KDTree::~KDTree()
 		{
 			Node* current_node = active_nodes.front();
 
-			if (current_node->left)
-				active_nodes.push_back(current_node->left);
-			if (current_node->right)
-				active_nodes.push_back(current_node->left);
-			
+			if (current_node)
+			{
+			///	delete current_node;
+				if (current_node->left)
+					active_nodes.push_back(current_node->left);
+				if (current_node->right)
+					active_nodes.push_back(current_node->left);
+				current_node = NULL;
+			}
 			active_nodes.pop_front();
-			delete current_node;
-			current_node = NULL;
 		}
 	}
 }

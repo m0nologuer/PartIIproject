@@ -4,12 +4,16 @@
 #include <stdio.h>
 #include "KDTree.h"
 
+#define USE_KDTREE 0
+
 void ParticleContainer::applyPhysics(double delta)
 {
 	delta = delta * 0.001;
 
-	//start by building k-D tree
+#ifdef USE_KDTREE
+	//start by building the k-D tree
 	KDTree tree(container, max_particle_count);
+#endif 
 
 	//update data structure
 	for (int i = 0; i < max_particle_count; i++){
@@ -23,7 +27,11 @@ void ParticleContainer::applyPhysics(double delta)
 			p.predicted_pos = p.pos + p.speed * (double)delta;
 
 			//find neighbouring particles
+#ifdef USE_KDTREE
 			neighbours[i] = tree.findNeighbouringParticles(p, h);
+#else
+			neighbours[i] = findNeighbouringParticles(p);
+#endif
 		}
 	}
 
@@ -136,15 +144,15 @@ Particle::vec3 ParticleContainer::getParticleForce(Particle::vec3 pos)
 	// Simulate simple physics : gravity only, no collisions
 	return Particle::vec3(0, -9.81, 0);
 }
-vector<int> ParticleContainer::findNeighbouringParticles(Particle postion)
+vector<Particle*> ParticleContainer::findNeighbouringParticles(Particle postion)
 {
-	vector<int> neighbours;
+	vector<Particle*> neighbours;
 	for (int i = 0; i < max_particle_count; i++){
 		if (container[i].life > 0.0f){
 			Particle::vec3 direction = postion.pos - container[i].pos;
 			double distance = Particle::vec3::dot(direction, direction);
 			if (distance < h_squared)
-				neighbours.push_back(i);
+				neighbours.push_back(&(container[i]));
 		}
 	}
 	return neighbours;

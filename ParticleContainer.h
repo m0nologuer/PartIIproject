@@ -81,7 +81,7 @@ private:
 	//physics helper functions
 	void solverIteration();
 	Particle::vec3 getParticleForce(Particle::vec3 postion);
-	vector<int> findNeighbouringParticles(Particle postion);
+	vector<Particle*> findNeighbouringParticles(Particle postion);
 	Particle::vec3 collisionUpdate(int index);
 
 	//constraint functions
