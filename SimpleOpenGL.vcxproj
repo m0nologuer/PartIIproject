@@ -54,7 +54,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\glext\include;..\glew\include;..\glut;..\assimp\include;..\jsoncpp-master\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\glext\include;..\glew\include;..\glut;..\assimp\include;..\jsoncpp-master\include;..\DevIL\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -64,9 +64,9 @@
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>glut32.lib;assimpd.lib;glext.lib;glew32.lib;jsoncpp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>glut32.lib;assimpd.lib;glext.lib;glew32.lib;jsoncpp.lib;DevIL.lib;ILU.lib;ILUT.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(ProjectName).exe</OutputFile>
-      <AdditionalLibraryDirectories>..\glut;..\glext\lib;..\assimp\lib32;..\assimp\bin32;..\assimp\lib\Debug;..\glew\lib;..\Debug;..\jsoncpp-master\lib\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\glut;..\glext\lib;..\assimp\lib32;..\assimp\bin32;..\assimp\lib\Debug;..\glew\lib;..\Debug;..\jsoncpp-master\lib\Debug;..\DevIL\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
@@ -112,6 +112,12 @@ copy ..\..\bin\assimp_release-dll_Win32\Assimp32.dll ..\bin
     <ClCompile Include="ParticleComputation.cpp" />
     <ClCompile Include="ParticleContainer.cpp" />
     <ClCompile Include="ParticleGL.cpp" />
+    <ClCompile Include="ParticleSystemTests\TestUtil.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+      </PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="QuadTree.cpp" />
     <ClCompile Include="util\shader.cpp" />
     <ClCompile Include="util\texture.cpp" />
   </ItemGroup>
@@ -122,6 +128,8 @@ copy ..\..\bin\assimp_release-dll_Win32\Assimp32.dll ..\bin
     <ClInclude Include="Particle.h" />
     <ClInclude Include="ParticleContainer.h" />
     <ClInclude Include="ParticleKernels.h" />
+    <ClInclude Include="ParticleSystemTests\TestUtil.h" />
+    <ClInclude Include="QuadTree.h" />
     <ClInclude Include="util\shader.hpp" />
     <ClInclude Include="util\texture.hpp" />
   </ItemGroup>

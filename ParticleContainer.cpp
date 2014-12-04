@@ -11,17 +11,27 @@ ParticleContainer::ParticleContainer()
 	}
 	average_speed = 0;
 
-	Wq = W_poly6(Particle::vec3(q,0,0));
-	h = 0.1; //distance paramter
-	e0 = 0.01; //relaxion parameter
-
 	//for the correction 
+	h = 5; //distance paramter
+	e0 = 0.1; //relaxion parameter
 	corr_k = 0.1;
 	q = 0.1*h;
 	p0 = 0.5; //rest desngity
 
+	Wq = W_poly6(Particle::vec3(q,0,0));
+
 	particles_color_buffer = NULL;
 	particles_position_buffer = NULL;
+	tree = NULL;
+
+	addNewParticles(1); //initialize with a lot of particles
+
+	//hard code colors
+	colors[0][0] = 83; colors[0][1] = 119; colors[0][2] = 122;
+	colors[1][0] = 84; colors[1][1] = 36; colors[1][2] = 55;
+	colors[2][0] = 192; colors[2][1] = 41; colors[2][2] = 66;
+	colors[3][0] = 217; colors[2][1] = 91; colors[2][2] = 67;
+	colors[3][0] = 236; colors[2][1] = 208; colors[2][2] = 120;
 }
 ParticleContainer::~ParticleContainer()
 {
@@ -31,6 +41,10 @@ int ParticleContainer::getParticleCount(){
 }
 double ParticleContainer::getAverageSpeed(){
 	return average_speed;
+}
+void ParticleContainer::SetObstacle(ColladaLoader* m)
+{
+	mesh = m;
 }
 std::string ParticleContainer::livePositionsList()
 {
@@ -44,6 +58,13 @@ std::string ParticleContainer::livePositionsList()
 			sprintf((char*)buffer, "%f, %f, %f \n", p.x, p.y, p.z);
 			output += buffer;
 		}
+	return output;
+}
+std::vector<Particle> ParticleContainer::getAll()
+{
+	std::vector<Particle> output;
+	for (int i = 0; i < max_particle_count; i++)
+		output.push_back(container[i]);
 	return output;
 }
 int ParticleContainer::getUnusedParticle(){
@@ -67,11 +88,9 @@ int ParticleContainer::getUnusedParticle(){
 void ParticleContainer::addNewParticles(double delta)
 {
 	//specified number of particles per time period;
-	int new_particles = delta*particles_per_second > particles_per_second ? particles_per_second : (int)(delta * particles_per_second); //100 particles per second
-	new_particles++;
 
-	for (int i = 0; i < new_particles; i++)
-	{
+	for (int i = 0; i < particles_per_iteration; i++)
+	{ 
 		int index = getUnusedParticle();
 		Particle& p = container[index]; // shortcut
 
@@ -79,8 +98,9 @@ void ParticleContainer::addNewParticles(double delta)
 		double theta = (rand() % 628)*0.01;
 		double phi = (rand() % 314)*0.01;
 
-		p.pos = Particle::vec3(sin(phi)*cos(theta), cos(phi), sin(phi)*sin(theta))*0.1;
-		p.speed = Particle::vec3(0,1,0)*50;
+		p.pos = Particle::vec3(sin(phi)*cos(theta), -1 + (rand())*0.01,
+			sin(phi)*sin(theta))*0.2;
+		p.speed = Particle::vec3(0,1,0);
 		p.life = 5.0f; //lasts 5 seconds
 
 		//setting misc parameters randomly for now
@@ -88,11 +108,11 @@ void ParticleContainer::addNewParticles(double delta)
 		p.angle = (rand() % 100)*0.01;
 		p.weight = (rand() % 100)*0.01;
 
-		//random color
-		p.r = rand() % 255;
-		p.g = rand() % 255;
-		p.b = rand() % 255;
-		p.a = rand() % 255;
+		//start color
+		p.r = 83;
+		p.g = 119;
+		p.b = 122;
+		p.a = 255;
 
 		//new particles added to back of camera queue
 		p.cameradistance = -1.0f;
@@ -107,6 +127,9 @@ void ParticleContainer::UpdateParticles(double delta)
 
 	render_counter = 0;
 
+	//for rendering blended particles
+	std::sort(container, container + max_particle_count);
+
 	for (int i = 0; i< max_particle_count; i++){
 
 		Particle& p = container[i]; // shortcut
@@ -115,11 +138,17 @@ void ParticleContainer::UpdateParticles(double delta)
 			// Decrease life
 			p.life -= delta;
 
-			if (p.life > 0.0f){			
+			//remove particles that have drifted out of view
+			if (Particle::vec3::dot(p.pos, p.pos) > 10000)
+				p.life = -1;
 
-				//For particle sorting
-				Particle::vec3 c_vec = p.pos + (camera_pos * -1.0f);
-				p.cameradistance = sqrt(c_vec.x*c_vec.x + c_vec.y*c_vec.y + c_vec.z*c_vec.z);
+			//change color
+			int col = rand() % 5;
+			int r = (p.r * 15 + colors[col][0]) / 16; p.r = (char)r;
+			int g = (p.g * 15 + colors[col][1]) / 16; p.g = (char)g;
+			int b = (p.b * 15 + colors[col][2]) / 16; p.b = (char)b;
+
+			if (p.life > 0.0f){			
 
 				// Fill the GPU buffer
 				g_particle_position_data[4 * render_counter + 0] = p.pos.x;

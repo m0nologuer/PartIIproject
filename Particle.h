@@ -42,5 +42,13 @@ struct Particle{
 	double lambda;
 	double size, angle, weight;
 	double life; // Remaining life of the particle. if < 0 : dead and unused.
+	
 	double cameradistance; //for sorting
+	bool operator<(Particle const& p)
+	{
+		if (p.life < 0) //dead particles go at the end
+			return false;
+		else
+			return (cameradistance < p.cameradistance);
+	}
 };

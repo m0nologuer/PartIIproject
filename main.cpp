@@ -16,7 +16,6 @@
 #include <GL/glut.h>
 #include <GL/glext.h>
 
-#include "COLLADALoader.h"
 #include "ParticleContainer.h"
 #include "GlobalSettings.h"
 
@@ -36,7 +35,7 @@ void do_motion(void)
 
 	int time = glutGet(GLUT_ELAPSED_TIME);
 	c_loader.angle += (time - prev_time)*0.01;
-	p_container.UpdateParticles((time - prev_time)*0.0001); //convert ms to s
+	p_container.UpdateParticles(0.02); //fixed time interval
 	prev_time = time;
 
 	frames += 1;
@@ -84,7 +83,7 @@ void display(void)
 		glEndList();
 	}
 
-	glCallList(scene_list);
+	//glCallList(scene_list);
 
 	p_container.Draw();
 	
@@ -130,7 +129,7 @@ int main(int argc, char **argv)
 	// the model name can be specified in the settings.
 	char* model_name = settings.getAssetLocation("model_name");
 	c_loader.loadasset(model_name);
-
+	//p_container.SetObstacle(&c_loader);
 
 	glClearColor(0.1f,0.1f,0.1f,1.f);
 

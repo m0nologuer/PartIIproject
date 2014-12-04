@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include <gl/glew.h>
 #include "MeshAdjacancyGraph.h"
-#include "COLLADALoader.h"
 #include "GlobalSettings.h"
 #include "CppUnitTest.h"
 #include <GL/glut.h>

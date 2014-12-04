@@ -2,15 +2,16 @@
 #include "ParticleKernels.h"
 
 #include <stdio.h>
-#include "KDTree.h"
+#include <math.h>
 
-#define USE_KDTREE 0
+#define USE_KDTREE 
 
 void ParticleContainer::applyPhysics(double delta)
 {
 #ifdef USE_KDTREE
-	//start by building the k-D tree
-	KDTree tree(container, max_particle_count);
+	//start by building the k-D tree if we don't have one
+	if (!tree)
+		tree = new KDTree(container, max_particle_count);
 #endif 
 
 	//update data structure
@@ -26,7 +27,7 @@ void ParticleContainer::applyPhysics(double delta)
 
 			//find neighbouring particles
 #ifdef USE_KDTREE
-			neighbours[i] = tree.findNeighbouringParticles(p, h);
+			neighbours[i] = tree->findNeighbouringParticles(p, h);
 #else
 			neighbours[i] = findNeighbouringParticles(p);
 #endif
@@ -41,7 +42,28 @@ void ParticleContainer::applyPhysics(double delta)
 	for (int i = 0; i < max_particle_count; i++){
 		container[i].speed = (container[i].predicted_pos - container[i].pos * 1.0) *(1 / delta);
 		container[i].pos = container[i].predicted_pos;
+
+		/*
+		//testing inside the mesh
+		aiVector3D new_point(container[i].predicted_pos.x, container[i].predicted_pos.y,
+			container[i].predicted_pos.z);
+		if (!mesh->inside_mesh(new_point)) //only update it if inside the mesh
+		*/
+
+		//For particle sorting
+		Particle::vec3 c_vec = container[i].pos + (camera_pos * -1.0f);
+		container[i].cameradistance = sqrt(c_vec.x*c_vec.x + c_vec.y*c_vec.y + 
+			c_vec.z*c_vec.z);
 	}
+#ifdef USE_KDTREE
+	//refresh kdtree periodically
+	if (rand() % 5 == 0)
+	{
+		delete tree;
+		tree = NULL;
+	}
+#endif
+
 }
 void ParticleContainer::solverIteration()
 {
@@ -139,8 +161,16 @@ double ParticleContainer::lambda(int index)
 
 Particle::vec3 ParticleContainer::getParticleForce(Particle::vec3 pos)
 {
-	// Simulate simple physics : gravity only, no collisions
+	// Simulate simple physics : gravity only, no collision;
 	return Particle::vec3(0, -9.81, 0);
+
+#ifdef SPHERE
+	//collision with imaginary sphere
+	if (Particle::vec3::dot(pos, pos)> 1)
+		return pos * -1.0;
+	else
+		return Particle::vec3(0, 0, 0);
+#endif
 }
 vector<Particle*> ParticleContainer::findNeighbouringParticles(Particle postion)
 {

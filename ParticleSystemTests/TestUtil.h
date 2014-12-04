@@ -1,16 +1,9 @@
-#include <gl/glew.h>
-#include <GL/glut.h>
-#include <GL/glext.h>
-#include "CppUnitTest.h"
 #include <chrono>
-#include <stdio.h>
 #include <string>
 #include <IL/il.h>
 #include <fstream>
 
 typedef char BYTE;
-
-using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
 void GLInitTesting();
 std::string benchmark_result_format(double* indep_var, int var_count, int time);

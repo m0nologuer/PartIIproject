@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include <gl/glew.h>
 #include "MeshAdjacancyGraph.h"
-#include "COLLADALoader.h"
 #include "GlobalSettings.h"
 #include "CppUnitTest.h"
 #include <GL/glut.h>
@@ -52,6 +51,7 @@ namespace ParticleSystemTests
 				settings.getAssetLocation("vertex_shader"),
 				settings.getAssetLocation("pixel_shader"));
 		
+/*
 			GLuint colorTex, depthTex, fbo;
 			// create a RGBA color texture
 			glGenTextures(1, &colorTex);
@@ -76,12 +76,12 @@ namespace ParticleSystemTests
 			// attach color
 			glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, colorTex, 0);
 			glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, depthTex, 0);
-
+*/
 			int FRAME_COUNT = 30; //number of frames in gif
 			for (int i = 0; i < FRAME_COUNT; i++)
 			{
 				// bind the framebuffer as the output framebuffer
-				glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
+			//	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
 
 				c_loader.angle += 0.01;
 				p_container.UpdateParticles(0.1); //convert ms to s
@@ -113,9 +113,8 @@ namespace ParticleSystemTests
 
 				// bind the framebuffer as the output framebuffer
 				std::string str = make_filename("../../output/images/simple_screencap/",
-					"frame","tga");
+					"frame","bmp");
 				save_screenshot(1024, 768, (char*)str.c_str());
-			//	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 			}
 		}
 		TEST_METHOD(Test3DModelValid)

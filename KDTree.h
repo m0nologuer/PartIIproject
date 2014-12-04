@@ -1,6 +1,14 @@
 #pragma once
-#include "ParticleContainer.h"
+#include "Particle.h"
 #include <deque>
+#include <math.h>
+#include <cstdlib>
+#include <vector>
+
+using namespace std;
+
+#include <GL/glut.h>
+#include <GL/glext.h>
 
 class KDTree
 {

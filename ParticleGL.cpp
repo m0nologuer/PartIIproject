@@ -65,6 +65,10 @@ void ParticleContainer::Draw()
 	// Use our shader
 	glUseProgram(programID);
 
+	//set blend mode
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
 	// Bind our texture in Texture Unit 0
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, billboardTextureID);

@@ -9,7 +9,8 @@ using namespace std;
 
 #include <GL/glut.h>
 #include <GL/glext.h>
-#include "Particle.h"
+#include "KDTree.h"
+#include "COLLADALoader.h"
 
 #define h_squared (h*h)
 #define h_6 (h_squared*h_squared*h_squared)
@@ -31,6 +32,7 @@ public:
 	~ParticleContainer();
 
 	void Init(char* texture, char* vertexShader, char* pixelShader);
+	void SetObstacle(ColladaLoader* mesh);
 	void UpdateParticles(double delta);
 	void Draw();
 
@@ -38,9 +40,10 @@ public:
 	int getParticleCount();
 	double getAverageSpeed();
 	std::string livePositionsList();
+	std::vector<Particle> getAll();
 private:
-	static const int particles_per_second = 40;
-	static const int iteration_count = 45;
+	static const int particles_per_iteration = 50;
+	static const int iteration_count = 25;
 
 	float Wq;
 	float h;
@@ -49,7 +52,11 @@ private:
 	float e0;
 	float p0;
 
+	char colors[5][3];
+
 	Particle container[max_particle_count];
+	KDTree* tree;
+	ColladaLoader* mesh;
 
 	//for rendering
 	Particle::vec3 camera_pos;

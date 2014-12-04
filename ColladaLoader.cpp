@@ -83,9 +83,22 @@ bool ColladaLoader::recursive_inside_mesh(const aiScene *sc, const aiNode* nd, a
 				if (face->mNumIndices > 2)
 				{
 					//raycast along line pararell to z axis
-					 
+					aiVector3D dir = position - mesh->mVertices[face->mIndices[0]];
+					for (int i = 1; i < face->mNumIndices - 1; i++)
+					{
+						aiVector3D axis1 = mesh->mVertices[face->mIndices[i]]
+							- mesh->mVertices[face->mIndices[0]];
+						aiVector3D axis2 = mesh->mVertices[face->mIndices[i + 1]]
+							- mesh->mVertices[face->mIndices[0]];
+
+						double l1 = axis1*dir;
+						double l2 = axis2*dir;
+
+						//if there is an intersection 
+						if (l1 >= 0 && l1 <= 1 && l2 >= 0 && l2 <= 1 && l1 + l2 <= 1)
+							intersect_count++;
+					}
 				}
-				
 			} 
 		}
 	}
