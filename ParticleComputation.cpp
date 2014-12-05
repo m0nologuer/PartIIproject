@@ -22,7 +22,7 @@ void ParticleContainer::applyPhysics(double delta)
 		if (p.life > 0.0f){
 
 			//update  speed and position
-			p.speed = p.speed + getParticleForce(p.pos) * (double)delta;
+			p.speed = p.speed + getParticleForce(p) * (double)delta;
 			p.predicted_pos = p.pos + p.speed * (double)delta;
 
 			//find neighbouring particles
@@ -159,9 +159,14 @@ double ParticleContainer::lambda(int index)
 	return -numerator / denomninator;
 }
 
-Particle::vec3 ParticleContainer::getParticleForce(Particle::vec3 pos)
+Particle::vec3 ParticleContainer::getParticleForce(Particle pos)
 {
 	// Simulate simple physics : gravity only, no collision;
+	if (pos.pos.y < 25)
+	{
+		pos.pos.y = 25;
+		return Particle::vec3(0, -pos.speed.y * 5, 0); //collision with ground
+	}
 	return Particle::vec3(0, -9.81, 0);
 
 #ifdef SPHERE

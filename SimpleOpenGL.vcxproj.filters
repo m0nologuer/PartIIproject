@@ -29,9 +29,6 @@
     <ClCompile Include="QuadTree.cpp">
       <Filter>Mesh</Filter>
     </ClCompile>
-    <ClCompile Include="ParticleSystemTests\TestUtil.cpp">
-      <Filter>Utilities</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ParticleContainer.h">
@@ -61,9 +58,6 @@
     <ClInclude Include="QuadTree.h">
       <Filter>Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="ParticleSystemTests\TestUtil.h">
-      <Filter>Utilities</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Utilities">
@@ -75,5 +69,13 @@
     <Filter Include="Mesh">
       <UniqueIdentifier>{dc3b27a1-063e-4bec-bd70-b819673f8a7e}</UniqueIdentifier>
     </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\..\..\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v6.5\extras\visual_studio_integration\MSBuildExtensions\CUDA 6.5.props" />
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="ParticleSystemCUDAKernels.cu">
+      <Filter>Particles</Filter>
+    </CudaCompile>
   </ItemGroup>
 </Project>

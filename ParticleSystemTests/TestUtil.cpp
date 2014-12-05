@@ -1,4 +1,4 @@
-
+#include "stdafx.h"
 #include "TestUtil.h"
 #include <gl/glew.h>
 #include <GL/glut.h>

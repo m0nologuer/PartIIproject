@@ -89,9 +89,12 @@ private:
 
 	//physics helper functions
 	void solverIteration();
-	Particle::vec3 getParticleForce(Particle::vec3 postion);
+	Particle::vec3 getParticleForce(Particle postion);
 	vector<Particle*> findNeighbouringParticles(Particle postion);
 	Particle::vec3 collisionUpdate(int index);
+
+	//CUDA accelerated physics
+	void solverIteration_CUDA();
 
 	//constraint functions
 	double constraint_function(int index);

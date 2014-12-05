@@ -98,9 +98,10 @@ void ParticleContainer::addNewParticles(double delta)
 		double theta = (rand() % 628)*0.01;
 		double phi = (rand() % 314)*0.01;
 
-		p.pos = Particle::vec3(sin(phi)*cos(theta), -1 + (rand())*0.01,
-			sin(phi)*sin(theta))*0.2;
-		p.speed = Particle::vec3(0,1,0);
+		p.pos = Particle::vec3(sin(phi)*cos(theta) * 10, cos(phi)*cos(theta) + 50,
+			sin(phi)*sin(theta) * 10);
+		p.speed = Particle::vec3(theta, -(rand() % 45 + 155), phi);
+			//p.pos *-0.05;
 		p.life = 5.0f; //lasts 5 seconds
 
 		//setting misc parameters randomly for now
