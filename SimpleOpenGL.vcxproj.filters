@@ -2,80 +2,89 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="ParticleGL.cpp">
+      <Filter>Particle</Filter>
+    </ClCompile>
     <ClCompile Include="ParticleContainer.cpp">
-      <Filter>Particles</Filter>
-    </ClCompile>
-    <ClCompile Include="GlobalSettings.cpp">
-      <Filter>Utilities</Filter>
-    </ClCompile>
-    <ClCompile Include="util\shader.cpp">
-      <Filter>Utilities</Filter>
-    </ClCompile>
-    <ClCompile Include="util\texture.cpp">
-      <Filter>Utilities</Filter>
-    </ClCompile>
-    <ClCompile Include="KDTree.cpp">
-      <Filter>Particles</Filter>
+      <Filter>Particle</Filter>
     </ClCompile>
     <ClCompile Include="ParticleComputation.cpp">
-      <Filter>Particles</Filter>
-    </ClCompile>
-    <ClCompile Include="ParticleGL.cpp">
-      <Filter>Particles</Filter>
-    </ClCompile>
-    <ClCompile Include="ColladaLoader.cpp">
-      <Filter>Mesh</Filter>
+      <Filter>Particle</Filter>
     </ClCompile>
     <ClCompile Include="QuadTree.cpp">
-      <Filter>Mesh</Filter>
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="KDTree.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="ColladaLoader.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="GlobalSettings.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="util\shader.cpp">
+      <Filter>Util\External</Filter>
+    </ClCompile>
+    <ClCompile Include="util\texture.cpp">
+      <Filter>Util\External</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ParticleContainer.h">
-      <Filter>Particles</Filter>
-    </ClInclude>
-    <ClInclude Include="GlobalSettings.h">
-      <Filter>Utilities</Filter>
-    </ClInclude>
-    <ClInclude Include="util\shader.hpp">
-      <Filter>Utilities</Filter>
-    </ClInclude>
-    <ClInclude Include="util\texture.hpp">
-      <Filter>Utilities</Filter>
-    </ClInclude>
-    <ClInclude Include="KDTree.h">
-      <Filter>Particles</Filter>
+    <ClInclude Include="Particle.h">
+      <Filter>Particle</Filter>
     </ClInclude>
     <ClInclude Include="ParticleKernels.h">
-      <Filter>Particles</Filter>
+      <Filter>Particle</Filter>
     </ClInclude>
-    <ClInclude Include="Particle.h">
-      <Filter>Particles</Filter>
-    </ClInclude>
-    <ClInclude Include="COLLADALoader.h">
-      <Filter>Mesh</Filter>
+    <ClInclude Include="ParticleContainer.h">
+      <Filter>Particle</Filter>
     </ClInclude>
     <ClInclude Include="QuadTree.h">
-      <Filter>Mesh</Filter>
+      <Filter>Util</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <Filter Include="Utilities">
-      <UniqueIdentifier>{73586489-e47f-4783-ad58-7a7b64380c11}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Particles">
-      <UniqueIdentifier>{50ec4d66-26c6-4194-9744-7c089bcc9d24}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Mesh">
-      <UniqueIdentifier>{dc3b27a1-063e-4bec-bd70-b819673f8a7e}</UniqueIdentifier>
-    </Filter>
+    <ClInclude Include="KDTree.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="COLLADALoader.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="GlobalSettings.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="util\texture.hpp">
+      <Filter>Util\External</Filter>
+    </ClInclude>
+    <ClInclude Include="util\shader.hpp">
+      <Filter>Util\External</Filter>
+    </ClInclude>
+    <ClInclude Include="GPUHelpers.h">
+      <Filter>Util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\..\..\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v6.5\extras\visual_studio_integration\MSBuildExtensions\CUDA 6.5.props" />
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="ParticleSystemCUDAKernels.cu">
-      <Filter>Particles</Filter>
+    <Filter Include="Particle">
+      <UniqueIdentifier>{dab8e739-ed65-4315-a246-6336f5064f67}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Util">
+      <UniqueIdentifier>{fcb9b299-5854-4ee2-ab1f-7f41101cbad0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Util\External">
+      <UniqueIdentifier>{ef2e0075-9368-4683-9c1e-4524b123815c}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="ParticleSystemCUDA.cu">
+      <Filter>Particle</Filter>
     </CudaCompile>
+    <CudaCompile Include="KDTree.cu">
+      <Filter>Util</Filter>
+    </CudaCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="RefactoredCode.txt" />
   </ItemGroup>
 </Project>

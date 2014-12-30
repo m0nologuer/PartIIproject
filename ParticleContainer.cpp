@@ -123,8 +123,15 @@ void ParticleContainer::addNewParticles(double delta)
 } 
 void ParticleContainer::UpdateParticles(double delta)
 {	
-	addNewParticles(delta); 
+	int start_time = glutGet(GLUT_ELAPSED_TIME);
+	int time;
+
+	addNewParticles(delta);
+	RECORD_SPEED("Add new particles %d ms \n");
+
 	applyPhysics(delta);
+	RECORD_SPEED("Apply physics  %d ms \n");
+
 
 	render_counter = 0;
 
@@ -172,4 +179,6 @@ void ParticleContainer::UpdateParticles(double delta)
 
 		}
 	}
+
+	RECORD_SPEED("Copy to buffer  %d ms \n");
 }

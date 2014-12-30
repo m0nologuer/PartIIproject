@@ -46,7 +46,7 @@ namespace ParticleSystemTests
 				auto start_time = std::chrono::high_resolution_clock::now();
 
 				//build tree
-				KDTree tree(dummy_particles, dummy_count);
+				KDTree tree(dummy_particles, dummy_count,1);
 				//find all particles with a distance of 20
 				tree.findNeighbouringParticles(dummy_particles[0], 50);
 

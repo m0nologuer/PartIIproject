@@ -6,6 +6,9 @@
 #include <device_launch_parameters.h>
 #include "ParticleContainer.h"
 
+#define MAX_NEIGHBOURS 30
+#define MAX_PARTICLE_COUNT 2048
+
 // Device code
 extern "C" __global__ void vectorAdd(const float *A, const float *B, float *C, int N)
 {
@@ -13,6 +16,27 @@ extern "C" __global__ void vectorAdd(const float *A, const float *B, float *C, i
 
 	if (i < N)
 		C[i] = A[i] + B[i];
+}  
+extern "C" __device__ void lambda(const float *A, const float *B, float *C, int N)
+{
+	int i = blockDim.x * blockIdx.x + threadIdx.x;
+
+	if (i < N)
+		C[i] = A[i] + B[i];
+}
+extern "C" __global__ void solverIteration(Particle *particles, int *neighbour_indexes)
+{
+	int i = blockDim.x * blockIdx.x + threadIdx.x;
+
+}
+
+void ParticleContainer::intialize_CUDA()
+{
+
+} 
+void ParticleContainer::cleanup_CUDA()
+{
+
 }
 void ParticleContainer::solverIteration_CUDA(void)
 {
@@ -37,7 +61,7 @@ void ParticleContainer::solverIteration_CUDA(void)
 	if (h_A == NULL || h_B == NULL || h_C == NULL)
 	{
 		fprintf(stderr, "Failed to allocate host vectors!\n");
-		exit(EXIT_FAILURE);
+		exit(EXIT_FAILURE);  
 	}
 
 	// Initialize the host input vectors

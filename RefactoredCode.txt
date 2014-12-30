@@ -1,0 +1,97 @@
+//iterative step in finding the median of a block
+//can only parellize one block
+//new indices is a subset of the original block that contains the median
+extern "C" __global__ void median_find(const float *positions, const int* indicies, const int K,
+	const int index_array_size,  int* new_indicies)
+{
+	int power_2_array_size = 1;
+	int power_2_log_array_size = 0;
+	while (power_2_array_size < index_array_size){ 
+		power_2_array_size *= 2; 
+		power_2_log_array_size++;
+	};
+	__shared__ int* medianAccum = new int[power_2_array_size * 2]();
+
+	//determine relavent subarray
+	for (int j = 0; j += blockDim.x; j < index_array_size)
+	{
+		//determine index
+		int i = j + threadIdx.x;
+		if (i >= index_array_size)
+			continue;
+
+		//compare with the zeroth element, the pivot, using relavent axis
+		int axis = K % 3;
+		bool greater_than = positions[3 * indicies[i] + axis] > positions[axis];
+
+		if (greater_than)
+			medianAccum[i] = 1;
+		else
+			medianAccum[i] = 0;
+	}
+
+	//additive reductions
+	for (int sum_size = 1; sum_size < power_2_array_size; sum_size *= 2)
+	{
+		__syncthreads();
+
+		for (int j = 0; j += blockDim.x; j < power_2_array_size / sum_size) //only logn operations
+		{
+			//tree-like summations to make it easy for each thread
+			//to see how many were greater than the median
+			int i = j + threadIdx.x;
+			if (i >= power_2_array_size)
+				continue;
+
+			int offset = power_2_array_size * 2 - power_2_array_size / sum_size;
+			int prev_offset = offset - power_2_array_size / sum_size;
+
+			int accum_index = i / 2 + offset;
+			int prev_accum_index = i + prev_offset;
+
+			medianAccum[accum_index] = medianAccum[accum_index] + medianAccum[prev_accum_index];
+		}
+	}
+	__syncthreads();
+
+	bool save_greater_than = (medianAccum[power_2_array_size * 2 - 1]> index_array_size / 2);
+
+	//count the number greater than the med
+	for (int j = 0; j += blockDim.x; j < MAX_PARTICLE_COUNT)
+	{
+		int i = j + threadIdx.x;
+		if (i >= index_array_size)
+			continue;
+
+		int save_value = save_greater_than ? 1 : 0;
+		if (medianAccum[i] ==  save_value)
+		{
+			//find our new index
+			int smaller_than_counter = 0;
+			int temp_i = i;
+			int base_2_comparator = power_2_array_size;
+
+			//logn operations
+			for (int i = power_2_log_array_size; i >= 0; i--)
+			{
+				if (temp_i > base_2_comparator)
+				{
+					temp_i -= base_2_comparator;
+				}
+				base_2_comparator /= 2;
+			}
+		}
+	}
+	//if statement to decide which half of the array to discard
+}
+extern "C" __global__ void rearrangeArray(const float *positions, const int *tree_indicies,
+	const int *subarray_positons, const int* medians, int *new_indicies, 
+	int *new_subarray_positions, int K)
+{
+	//compare the first element of the current subarry with x
+	//if necessary
+	int i = blockDim.x * blockIdx.x + threadIdx.x;
+
+
+
+}

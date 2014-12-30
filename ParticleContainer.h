@@ -7,7 +7,7 @@
 
 using namespace std;
 
-#include <GL/glut.h>
+#include <GL/glut.h>log_speed
 #include <GL/glext.h>
 #include "KDTree.h"
 #include "COLLADALoader.h"
@@ -16,11 +16,13 @@ using namespace std;
 #define h_6 (h_squared*h_squared*h_squared)
 #define h_9 (h_squared*h_squared*h_squared*h_squared*h)
 
+#define RECORD_SPEED(x) time = glutGet(GLUT_ELAPSED_TIME); printf(x, time-start_time); start_time = time;
+
 class ParticleContainer
 {
 public:
 	//constants
-	static const int max_particle_count = 2000;
+	static const int max_particle_count = 20000;
 	static const int n = 4;
 
 	//pointers to GL buffers
@@ -42,7 +44,7 @@ public:
 	std::string livePositionsList();
 	std::vector<Particle> getAll();
 private:
-	static const int particles_per_iteration = 50;
+	static const int particles_per_iteration = 2000;
 	static const int iteration_count = 25;
 
 	float Wq;
@@ -94,7 +96,9 @@ private:
 	Particle::vec3 collisionUpdate(int index);
 
 	//CUDA accelerated physics
+	void intialize_CUDA();
 	void solverIteration_CUDA();
+	void cleanup_CUDA();
 
 	//constraint functions
 	double constraint_function(int index);

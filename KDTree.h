@@ -19,6 +19,8 @@ class KDTree
 		Node* left;
 		Node* right;
 		Axis ax;
+		Particle *particle_blob;
+		int blob_size;
 	};
 
 	//used for building the tree
@@ -49,8 +51,22 @@ class KDTree
 	void buildNode(std::vector<Particle*>* particles, Axis a, Node* node);
 	void findNeighbouringParticles(Node* n, Particle p, 
 		std::vector<Particle*>& list, double rad);
+
+	//Hardware accelerated functions
+	bool hardware_acceleration;
+	int thread_count;
+	int particle_blob_size;
+	bool *output_grid;
+	bool *output_grid_CUDA;
+	void initialize_CUDA();
+	void initialize_CUDA_node(Node* p);
+	void destroy_CUDA();
+	void destroy_CUDA_node(Node* p);
+	void findNeighbouringParticles_CUDA(Node* n, Particle p,
+		std::vector<Particle*>& list, double rad);
+
 public:
-	KDTree(Particle* particle_container, int particle_count);
+	KDTree(Particle* particle_container, int particle_count, int threads);
 	~KDTree();
 	std::vector<Particle*> findNeighbouringParticles(Particle p, double rad);
 };

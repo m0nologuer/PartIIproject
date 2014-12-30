@@ -5,13 +5,19 @@
 #include <math.h>
 
 #define USE_KDTREE 
+#define MAX_THREADS 1000
 
 void ParticleContainer::applyPhysics(double delta)
 {
-#ifdef USE_KDTREE
+	int start_time = glutGet(GLUT_ELAPSED_TIME);
+	int time;
+
+#ifdef USE_KDTREE 
 	//start by building the k-D tree if we don't have one
 	if (!tree)
-		tree = new KDTree(container, max_particle_count);
+		tree = new KDTree(container, max_particle_count, 1);
+
+	RECORD_SPEED("Build K-D tree  %d ms \n");
 #endif 
 
 	//update data structure
@@ -34,9 +40,13 @@ void ParticleContainer::applyPhysics(double delta)
 		}
 	}
 
+	RECORD_SPEED("Find neighbouring particles  %d ms \n");
+
 	//Perform collision detection, solving
 	for (int i = 0; i < iteration_count; i++)
 		solverIteration();
+
+	RECORD_SPEED("Solver iteraions  %d ms \n");
 
 	//Update particle info
 	for (int i = 0; i < max_particle_count; i++){
@@ -55,6 +65,9 @@ void ParticleContainer::applyPhysics(double delta)
 		container[i].cameradistance = sqrt(c_vec.x*c_vec.x + c_vec.y*c_vec.y + 
 			c_vec.z*c_vec.z);
 	}
+
+	RECORD_SPEED("Update particle info  %d ms \n");
+
 #ifdef USE_KDTREE
 	//refresh kdtree periodically
 	if (rand() % 5 == 0)
