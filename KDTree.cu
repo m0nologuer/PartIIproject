@@ -4,7 +4,57 @@
 #include <math_functions.h>
 #include <device_launch_parameters.h>
 #include "KDTree.h"
-#include "GPUHelpers.h"
+#ifdef USE_CUDA
+
+
+extern "C" __global__ void findNeighbourArray(const Particle *positions, const int* indicies,
+	const int indices_size, const double radius, int* neighbours, int offset)
+{
+	//data shared between each block
+	__shared__ bool neighbour_check[MAX_THREADS * 2]; //since indices_size < MAX_THREADS
+
+	//sort out indexes
+	int id = blockDim.x * blockIdx.x + threadIdx.x + offset; //thread id, from 0 to MAX_PARTICLE_COUNT * MAX_NEIGHBOURS
+	int particle_index = id / indices_size; //the particle we sum at
+	int neighbour_index = id % indices_size; //the neighbour we sum at
+
+	//perform comparison
+	if (particle_index < indices_size)
+	{
+		Particle pos = positions[indicies[neighbour_index]];
+		Particle starting_pos = positions[indicies[particle_index]];
+		double distance = 0;
+		distance += (pos.pos.x - starting_pos.pos.x)* (pos.pos.x - starting_pos.pos.x);
+		distance += (pos.pos.y - starting_pos.pos.y)* (pos.pos.y - starting_pos.pos.y);
+		distance += (pos.pos.z - starting_pos.pos.z)* (pos.pos.z - starting_pos.pos.z);
+
+		neighbours[neighbour_index] = (distance < radius) && (particle_index != neighbour_index);
+	}
+	__syncthreads();
+
+	//perform reduction
+	if (neighbour_index == 0)
+	{
+		int neighbour_written_counter = 0;
+		int i = 0;
+		while (neighbour_written_counter < MAX_NEIGHBOURS)
+		{
+			//if we find a neighbour
+			if (neighbour_check[i] && i < indices_size)
+			{
+				neighbours[particle_index*MAX_NEIGHBOURS + neighbour_written_counter] = indicies[i];
+				neighbour_written_counter++;
+			}
+			i++;
+			//filing up blank space
+			if (!(i < indices_size))
+			{
+				neighbours[particle_index*MAX_NEIGHBOURS + neighbour_written_counter] = -1;
+				neighbour_written_counter++;
+			}
+		}
+	}
+}
 
 extern "C" __global__ void findNeighbours(const Particle *positions, const int positions_size,
 	const Particle starting_pos, const double radius, bool* neighbours)
@@ -23,18 +73,14 @@ extern "C" __global__ void findNeighbours(const Particle *positions, const int p
 }
 void KDTree::initialize_CUDA()
 {
-	//create output grid
-	size_t size = particle_blob_size * sizeof(bool);
-	output_grid = (bool*)malloc(size);
-	gpuErrchk(cudaMalloc((void **)&output_grid_CUDA, size));
-	gpuErrchk(cudaMemcpy(output_grid_CUDA, output_grid, size, cudaMemcpyHostToDevice));
+
 }
 //allocate memory CUDA  
 void KDTree::initialize_CUDA_node(Node* n)
 {
   	//create CUDA memory
-	Particle *particles_CUDA = NULL;
-	size_t size = n->blob_size * sizeof(Particle);
+	int *particles_CUDA = NULL;
+	size_t size = n->blob_size * sizeof(int);
 
 	//copy to device
 	gpuErrchk(cudaMalloc((void **)&particles_CUDA, size));
@@ -44,29 +90,31 @@ void KDTree::initialize_CUDA_node(Node* n)
 	delete[] n->particle_blob;
 	n->particle_blob = particles_CUDA;
 }
-void KDTree::findNeighbouringParticles_CUDA(Node* n, Particle p,
-	std::vector<Particle*>& list, double rad)
+void KDTree::batchNeighbouringParticles(double rad, const Particle* particles_CUDA, int* neighbours_CUDA)
 {
-	cudaDeviceSynchronize();
+	for (int i = 0; i < all_nodes.size(); i++)
+		if (all_nodes[i]->particle_blob) // if we're at a leaf node
+			batchNeighbouringParticles_CUDA(all_nodes[i], rad, particles_CUDA, neighbours_CUDA);
+
+}
+void KDTree::batchNeighbouringParticles_CUDA(const Node* n, double rad, const Particle* particles_CUDA, int* neighbours_CUDA)
+{
 	// Launch the CUDA Kernel
-	int threadsPerBlock = 256; //so we can have  multiple blocks on processors
-	int blocksPerGrid = thread_count / 256 + 1;
+	int threadsPerBlock = n->blob_size; //so we can have one particle computed per block
+	int blocksPerGrid = min(n->blob_size, 65536 / n->blob_size)-1; //avoid overstepping max no. of threads
+	int offset = 0;
+	
+	//launch until all subsets have been considered
+	while (offset < n->blob_size)
+	{
+		findNeighbourArray << <blocksPerGrid, blocksPerGrid >> >(particles_CUDA, n->particle_blob,
+			n->blob_size, rad, neighbours_CUDA, offset);
+		offset += blocksPerGrid;
+		cudaDeviceSynchronize();
 
-	findNeighbours << <blocksPerGrid, threadsPerBlock >> >(n->particle_blob, n->blob_size, p, rad, output_grid_CUDA);
-
+	}
 	//Error handling
 	gpuErrchk(cudaDeviceSynchronize());
 	gpuErrchk(cudaGetLastError());
-
-	//Copy the first MAX_NEIGHBOURS neighbours into the vector
-	size_t size = n->blob_size * sizeof(bool);
-	gpuErrchk(cudaMemcpy(output_grid, output_grid_CUDA, size, cudaMemcpyDeviceToHost));
-
-	int neighbour_count = 0;
-	for (int i = 0; i < n->blob_size; i++)
-		if (output_grid[i] && neighbour_count < MAX_NEIGHBOURS)
-		{
-			list.push_back(&n->particle_blob[i]);
-			neighbour_count++;
-		}
 }
+#endif

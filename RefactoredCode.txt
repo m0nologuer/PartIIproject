@@ -1,3 +1,20 @@
+For code that has been replaced and will most likely not be used again
+
+
+	/*
+	//create the neighbour array
+	for (int i = 0; i < MAX_PARTICLE_COUNT; i++)
+		if (container[i].life > 0)
+			for (int j = 0; j < MAX_NEIGHBOURS; j++)
+				if (neighbours[i].size() > j)
+					neighbour_array[i*MAX_NEIGHBOURS + j] = (neighbours[i][j] - container);
+				else
+					neighbour_array[i*MAX_NEIGHBOURS + j] = -1;
+	
+	RECORD_SPEED("		Create neighbour array  %d ms \n");
+	*/
+
+
 //iterative step in finding the median of a block
 //can only parellize one block
 //new indices is a subset of the original block that contains the median

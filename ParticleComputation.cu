@@ -5,7 +5,7 @@
 #include <math_functions.h>
 #include <device_launch_parameters.h>
 #include "ParticleContainer.h"
-#include "GPUHelpers.h"
+#ifdef USE_CUDA
 
 // Device code
 extern "C" __global__ void vectorAdd(const float *A, const float *B, float *C, int N)
@@ -219,22 +219,11 @@ void ParticleContainer::solverIterations_CUDA(void)
 	int start_time = glutGet(GLUT_ELAPSED_TIME);
 	int time;
 
-	//create the neighbour array
-	for (int i = 0; i < MAX_PARTICLE_COUNT; i++)
-		if (container[i].life > 0)
-			for (int j = 0; j < MAX_NEIGHBOURS; j++)
-				if (neighbours[i].size() > j)
-					neighbour_array[i*MAX_NEIGHBOURS + j] = (neighbours[i][j] - container);
-				else
-					neighbour_array[i*MAX_NEIGHBOURS + j] = -1;
-	
-	RECORD_SPEED("		Create neighbour array  %d ms \n");
-
 	//copy the data across
 	size_t mem_size = sizeof(Particle) * MAX_PARTICLE_COUNT;
 	gpuErrchk(cudaMemcpy(container_CUDA,container, mem_size, cudaMemcpyHostToDevice));
-	mem_size = sizeof(int) * MAX_PARTICLE_COUNT * MAX_NEIGHBOURS;
-	gpuErrchk(cudaMemcpy(neighbours_CUDA,neighbour_array, mem_size, cudaMemcpyHostToDevice));
+	//mem_size = sizeof(int) * MAX_PARTICLE_COUNT * MAX_NEIGHBOURS;
+	//gpuErrchk(cudaMemcpy(neighbours_CUDA,neighbour_array, mem_size, cudaMemcpyHostToDevice));
 
 	RECORD_SPEED("		Copy data across  %d ms \n");
 
@@ -432,4 +421,4 @@ void example_CUDA(void)
 	printf("Done\n");
 	return;
 }
-
+#endif

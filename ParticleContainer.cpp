@@ -109,7 +109,7 @@ void ParticleContainer::addNewParticles(double delta)
 			sin(phi)*sin(theta) * 10);
 		p.speed = Particle::vec3(theta, -(rand() % 45 + 155), phi);
 			//p.pos *-0.05;
-		p.life = 5.0f; //lasts 5 seconds
+		p.life = life; //lasts 1 second
 
 		//setting misc parameters randomly for now
 		p.size = ((rand() % 1000) / 2000.0f + 0.1f)*0.05;
@@ -143,7 +143,7 @@ void ParticleContainer::UpdateParticles(double delta)
 	render_counter = 0;
 
 	//for rendering blended particles
-	std::sort(container, container + max_particle_count);
+	//std::sort(container, container + max_particle_count);
 
 	for (int i = 0; i< max_particle_count; i++){
 

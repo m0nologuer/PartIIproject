@@ -15,14 +15,15 @@ bool KDTree::Comparator::operator() (Particle* a, Particle* b)
 	}
 	return greater;
 }
-KDTree::KDTree(Particle* particle_container, int particle_count, int threads)
+KDTree::KDTree(Particle* particle_container, int particle_count)
 {
+#ifdef USE_CUDA
 	//CUDA setttings
-	hardware_acceleration = threads > 1;
-	thread_count = min(threads, particle_count); //no point hvaing more threads than particles
-	particle_blob_size = min(threads * 2, particle_count);
-	if (hardware_acceleration)
-		initialize_CUDA();
+	particle_blob_size = min(MAX_THREADS, particle_count);
+	initialize_CUDA();
+#endif
+
+	container = particle_container;
 
 	//only count alive particles
 	std::vector<Particle*> particles;
@@ -53,23 +54,26 @@ Particle* KDTree::findMedian(std::vector<Particle*> particles, KDTree::Axis a)
 }
 void KDTree::buildNode(std::vector<Particle*>* particles, KDTree::Axis a, KDTree::Node* node)
 {
+	//add this node to the queue
+	all_nodes.push_back(node);
+
 	//if we're below the threshold to parellize completely & we want to pararellize
 	//make leaf blob
-	if (hardware_acceleration && particles->size() < particle_blob_size)
+#ifdef USE_CUDA
+	if (particles->size() < particle_blob_size)
 	{
 		node->p = NULL;
 		node->left = NULL;
 		node->right = NULL;
-		node->particle_blob = new Particle[particles->size()];
+		node->particle_blob = new int[particles->size()];
 		for (int i = 0; i < particles->size(); i++)
-			node->particle_blob[i] = *((*particles)[i]);
+			node->particle_blob[i] = (*particles)[i] - container; //fill up with indicies..
 		node->blob_size = particles->size();
-
 		initialize_CUDA_node(node);
 
 		return;
 	}
-
+#endif
 	//create new node
 	Particle* median_p = findMedian(*particles, a); //find hyperplane
 	node->p = median_p;
@@ -77,8 +81,6 @@ void KDTree::buildNode(std::vector<Particle*>* particles, KDTree::Axis a, KDTree
 	node->right = NULL;
 	node->ax = a;
 	comp.ax = a; //set compatator
-	node->particle_blob = NULL;
-	node->blob_size = 0;
 
 	//sort particles across hyperplane
 	std::vector<Particle*>* left = new std::vector<Particle*>();
@@ -111,17 +113,6 @@ void KDTree::buildNode(std::vector<Particle*>* particles, KDTree::Axis a, KDTree
 void KDTree::findNeighbouringParticles(Node* n, Particle p, 
 	std::vector<Particle*>& list, double rad)
 {
-	//no need to take more neighbours than necessary
-	if (list.size() > MAX_NEIGHBOURS)
-		return;
-
-	//if we are dealing with a small number of particles to parellize completely
-	if (hardware_acceleration && n->particle_blob != NULL)
-	{
-		findNeighbouringParticles_CUDA(n, p, list, rad);
-		return;
-	}
-
 	Particle::vec3 dist = p.pos - n->p->pos;
 	double distance_sq = Particle::vec3::dot(dist, dist);
 	if (distance_sq < rad)

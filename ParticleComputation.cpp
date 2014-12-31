@@ -12,7 +12,7 @@ void ParticleContainer::applyPhysics(double delta)
 #ifdef USE_KDTREE 
 	//start by building the k-D tree if we don't have one
 	if (!tree)
-		tree = new KDTree(container, max_particle_count, 1);
+		tree = new KDTree(container, max_particle_count);
 
 	RECORD_SPEED("	Build K-D tree  %d ms \n");
 #endif 
@@ -30,13 +30,20 @@ void ParticleContainer::applyPhysics(double delta)
 
 			//find neighbouring particles
 #ifdef USE_KDTREE
+#ifndef USE_CUDA
 			neighbours[i] = tree->findNeighbouringParticles(p, h);
+#endif
 #else
 			neighbours[i] = findNeighbouringParticles(p);
 #endif
 		}
 	}
 
+#ifdef USE_KDTREE
+#ifdef USE_CUDA
+	tree->batchNeighbouringParticles(h, container_CUDA, neighbours_CUDA); //parrell batch processing of neighbours
+#endif
+#endif
 	RECORD_SPEED("	Find neighbouring particles  %d ms \n");
 
 	//Perform collision detection, solving

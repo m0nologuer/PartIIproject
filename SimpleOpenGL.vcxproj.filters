@@ -58,7 +58,7 @@
     <ClInclude Include="util\shader.hpp">
       <Filter>Util\External</Filter>
     </ClInclude>
-    <ClInclude Include="GPUHelpers.h">
+    <ClInclude Include="PerformanceSettings.h">
       <Filter>Util</Filter>
     </ClInclude>
   </ItemGroup>

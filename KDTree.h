@@ -1,5 +1,6 @@
 #pragma once
 #include "Particle.h"
+#include "PerformanceSettings.h"
 #include <deque>
 #include <math.h>
 #include <cstdlib>
@@ -19,8 +20,10 @@ class KDTree
 		Node* left;
 		Node* right;
 		Axis ax;
-		Particle *particle_blob;
+#ifdef USE_CUDA
+		int *particle_blob;
 		int blob_size;
+#endif
 	};
 
 	//used for building the tree
@@ -47,27 +50,35 @@ class KDTree
 	} comp;
 
 	Node* root_node;
+	std::vector<Node*> all_nodes;
+	Particle* container; //zeroth entry for current tree
+
 	Particle* findMedian(std::vector<Particle*> paricles, Axis a);
 	void buildNode(std::vector<Particle*>* particles, Axis a, Node* node);
 	void findNeighbouringParticles(Node* n, Particle p, 
 		std::vector<Particle*>& list, double rad);
 
-	//Hardware accelerated functions
-	bool hardware_acceleration;
-	int thread_count;
+#ifdef USE_CUDA
+	//How to excecute the kernel
 	int particle_blob_size;
-	bool *output_grid;
-	bool *output_grid_CUDA;
+
+	//initializing
 	void initialize_CUDA();
 	void initialize_CUDA_node(Node* p);
 	void destroy_CUDA();
 	void destroy_CUDA_node(Node* p);
-	void findNeighbouringParticles_CUDA(Node* n, Particle p,
-		std::vector<Particle*>& list, double rad);
+
+	//finding the correct particle
+	void batchNeighbouringParticles_CUDA(const Node* n, double rad,
+		const Particle* particles_CUDA, int* neighbours_CUDA);
+#endif
 
 public:
-	KDTree(Particle* particle_container, int particle_count, int threads);
+	KDTree(Particle* particle_container, int particle_count);
 	~KDTree();
 	std::vector<Particle*> findNeighbouringParticles(Particle p, double rad);
+#ifdef USE_CUDA
+	void batchNeighbouringParticles(double rad, const Particle* particles_CUDA, int* neighbours_CUDA);
+#endif
 };
 

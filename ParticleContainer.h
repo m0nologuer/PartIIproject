@@ -10,13 +10,12 @@ using namespace std;
 #include <GL/glut.h>log_speed
 #include <GL/glext.h>
 #include "KDTree.h"
+#include "PerformanceSettings.h"
 #include "COLLADALoader.h"
 
 #define h_squared (h*h)
 #define h_6 (h_squared*h_squared*h_squared)
 #define h_9 (h_squared*h_squared*h_squared*h_squared*h)
-
-#define RECORD_SPEED(x) time = glutGet(GLUT_ELAPSED_TIME); printf(x, time-start_time); start_time = time;
 
 #define USE_KDTREE 
 
@@ -60,6 +59,7 @@ private:
 
 	static const int particles_per_iteration = 10000;
 	static const int iteration_count = 25;
+	static const int life = 1.0f;
 
 	float Wq;
 	float h;
