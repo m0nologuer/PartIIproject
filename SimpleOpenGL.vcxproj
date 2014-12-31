@@ -139,7 +139,7 @@ copy ..\..\bin\assimp_release-dll_Win32\Assimp32.dll ..\bin
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="KDTree.cu" />
-    <CudaCompile Include="ParticleSystemCUDA.cu" />
+    <CudaCompile Include="ParticleComputation.cu" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="RefactoredCode.txt" />

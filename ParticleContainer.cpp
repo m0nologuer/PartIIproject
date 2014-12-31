@@ -32,9 +32,16 @@ ParticleContainer::ParticleContainer()
 	colors[2][0] = 192; colors[2][1] = 41; colors[2][2] = 66;
 	colors[3][0] = 217; colors[2][1] = 91; colors[2][2] = 67;
 	colors[3][0] = 236; colors[2][1] = 208; colors[2][2] = 120;
+
+#ifdef USE_CUDA
+	intialize_CUDA();
+#endif
 }
 ParticleContainer::~ParticleContainer()
 {
+#ifdef USE_CUDA
+	cleanup_CUDA();
+#endif
 }
 int ParticleContainer::getParticleCount(){
 	return render_counter;

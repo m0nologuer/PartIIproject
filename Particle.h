@@ -1,3 +1,14 @@
+
+#define USE_CUDA
+#ifdef USE_CUDA
+#define MAX_NEIGHBOURS 16
+#define MAX_NEIGHBOURS_LOG 4
+#endif
+
+#define MAX_PARTICLE_COUNT 4098*16
+#define max_particle_count MAX_PARTICLE_COUNT
+
+
 struct Particle{
 	struct vec3{
 		double x;

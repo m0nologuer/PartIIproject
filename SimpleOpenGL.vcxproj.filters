@@ -77,11 +77,11 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="ParticleSystemCUDA.cu">
-      <Filter>Particle</Filter>
-    </CudaCompile>
     <CudaCompile Include="KDTree.cu">
       <Filter>Util</Filter>
+    </CudaCompile>
+    <CudaCompile Include="ParticleComputation.cu">
+      <Filter>Particle</Filter>
     </CudaCompile>
   </ItemGroup>
   <ItemGroup>

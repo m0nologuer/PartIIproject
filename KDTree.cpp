@@ -111,6 +111,10 @@ void KDTree::buildNode(std::vector<Particle*>* particles, KDTree::Axis a, KDTree
 void KDTree::findNeighbouringParticles(Node* n, Particle p, 
 	std::vector<Particle*>& list, double rad)
 {
+	//no need to take more neighbours than necessary
+	if (list.size() > MAX_NEIGHBOURS)
+		return;
+
 	//if we are dealing with a small number of particles to parellize completely
 	if (hardware_acceleration && n->particle_blob != NULL)
 	{

@@ -18,11 +18,12 @@ using namespace std;
 
 #define RECORD_SPEED(x) time = glutGet(GLUT_ELAPSED_TIME); printf(x, time-start_time); start_time = time;
 
+#define USE_KDTREE 
+
 class ParticleContainer
 {
 public:
 	//constants
-	static const int max_particle_count = 20000;
 	static const int n = 4;
 
 	//pointers to GL buffers
@@ -43,8 +44,21 @@ public:
 	double getAverageSpeed();
 	std::string livePositionsList();
 	std::vector<Particle> getAll();
+
 private:
-	static const int particles_per_iteration = 2000;
+#ifdef USE_CUDA
+	//CUDA accelerated physics
+	void intialize_CUDA();
+	void solverIterations_CUDA();
+	void cleanup_CUDA();
+
+	//CUDA variables
+	Particle* container_CUDA;
+	int* neighbours_CUDA;
+	int* neighbour_array;
+#endif
+
+	static const int particles_per_iteration = 10000;
 	static const int iteration_count = 25;
 
 	float Wq;
@@ -94,11 +108,6 @@ private:
 	Particle::vec3 getParticleForce(Particle postion);
 	vector<Particle*> findNeighbouringParticles(Particle postion);
 	Particle::vec3 collisionUpdate(int index);
-
-	//CUDA accelerated physics
-	void intialize_CUDA();
-	void solverIteration_CUDA();
-	void cleanup_CUDA();
 
 	//constraint functions
 	double constraint_function(int index);

@@ -25,7 +25,6 @@ GlobalSettings settings;
 
 GLuint scene_list;
 
-static int max_particle_count = 2000;
 // ----------------------------------------------------------------------------
 void do_motion(void)
 {

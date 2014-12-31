@@ -32,7 +32,7 @@ namespace ParticleSystemTests
 				std::vector<Particle> p_list = p_container.getAll();
 				p_container.UpdateParticles(0.2);
 
-				for (int j = 0; j < p_container.max_particle_count; j++)
+				for (int j = 0; j < max_particle_count; j++)
 				{
 					//check acceleration
 				//	p_list[j].lambda

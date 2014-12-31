@@ -6,9 +6,6 @@
 #include "KDTree.h"
 #include "GPUHelpers.h"
 
-#define MAX_NEIGHBOURS 30
-#define MAX_PARTICLE_COUNT 2048
-
 extern "C" __global__ void findNeighbours(const Particle *positions, const int positions_size,
 	const Particle starting_pos, const double radius, bool* neighbours)
 {
@@ -61,11 +58,15 @@ void KDTree::findNeighbouringParticles_CUDA(Node* n, Particle p,
 	gpuErrchk(cudaDeviceSynchronize());
 	gpuErrchk(cudaGetLastError());
 
-	//Copy the neighbours into the vector
+	//Copy the first MAX_NEIGHBOURS neighbours into the vector
 	size_t size = n->blob_size * sizeof(bool);
 	gpuErrchk(cudaMemcpy(output_grid, output_grid_CUDA, size, cudaMemcpyDeviceToHost));
 
+	int neighbour_count = 0;
 	for (int i = 0; i < n->blob_size; i++)
-		if (output_grid[i])
+		if (output_grid[i] && neighbour_count < MAX_NEIGHBOURS)
+		{
 			list.push_back(&n->particle_blob[i]);
+			neighbour_count++;
+		}
 }

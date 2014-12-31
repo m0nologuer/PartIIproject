@@ -4,9 +4,6 @@
 #include <stdio.h>
 #include <math.h>
 
-#define USE_KDTREE 
-#define MAX_THREADS 1000
-
 void ParticleContainer::applyPhysics(double delta)
 {
 	int start_time = glutGet(GLUT_ELAPSED_TIME);
@@ -17,7 +14,7 @@ void ParticleContainer::applyPhysics(double delta)
 	if (!tree)
 		tree = new KDTree(container, max_particle_count, 1);
 
-	RECORD_SPEED("Build K-D tree  %d ms \n");
+	RECORD_SPEED("	Build K-D tree  %d ms \n");
 #endif 
 
 	//update data structure
@@ -40,13 +37,18 @@ void ParticleContainer::applyPhysics(double delta)
 		}
 	}
 
-	RECORD_SPEED("Find neighbouring particles  %d ms \n");
+	RECORD_SPEED("	Find neighbouring particles  %d ms \n");
 
 	//Perform collision detection, solving
+#ifdef USE_CUDA
+	solverIterations_CUDA();
+	RECORD_SPEED("	CUDA solver iteraions  %d ms \n");
+
+#else
 	for (int i = 0; i < iteration_count; i++)
 		solverIteration();
-
-	RECORD_SPEED("Solver iteraions  %d ms \n");
+	RECORD_SPEED("	Solver iteraions  %d ms \n");
+#endif
 
 	//Update particle info
 	for (int i = 0; i < max_particle_count; i++){
@@ -66,7 +68,7 @@ void ParticleContainer::applyPhysics(double delta)
 			c_vec.z*c_vec.z);
 	}
 
-	RECORD_SPEED("Update particle info  %d ms \n");
+	RECORD_SPEED("	Update particle info  %d ms \n");
 
 #ifdef USE_KDTREE
 	//refresh kdtree periodically
@@ -175,9 +177,9 @@ double ParticleContainer::lambda(int index)
 Particle::vec3 ParticleContainer::getParticleForce(Particle pos)
 {
 	// Simulate simple physics : gravity only, no collision;
-	if (pos.pos.y < 25)
+	if (pos.pos.y < 0)
 	{
-		pos.pos.y = 25;
+		pos.pos.y = 0;
 		return Particle::vec3(0, -pos.speed.y * 5, 0); //collision with ground
 	}
 	return Particle::vec3(0, -9.81, 0);
