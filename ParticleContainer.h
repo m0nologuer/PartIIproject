@@ -57,9 +57,9 @@ private:
 	int* neighbour_array;
 #endif
 
-	static const int particles_per_iteration = 10000;
+	static const int particles_per_iteration = 200;
 	static const int iteration_count = 25;
-	static const int life = 1.0f;
+	static const int life = 5.0f;
 
 	float Wq;
 	float h;

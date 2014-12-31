@@ -32,6 +32,7 @@ extern "C" __global__ void findNeighbourArray(const Particle *positions, const i
 	}
 	__syncthreads();
 
+	
 	//perform reduction
 	if (neighbour_index == 0)
 	{

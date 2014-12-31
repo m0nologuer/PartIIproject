@@ -51,11 +51,10 @@ void ParticleContainer::applyPhysics(double delta)
 	solverIterations_CUDA();
 	RECORD_SPEED("	CUDA solver iteraions  %d ms \n");
 
-#else
+#else 
 	for (int i = 0; i < iteration_count; i++)
 		solverIteration();
 	RECORD_SPEED("	Solver iteraions  %d ms \n");
-#endif
 
 	//Update particle info
 	for (int i = 0; i < max_particle_count; i++){
@@ -76,6 +75,7 @@ void ParticleContainer::applyPhysics(double delta)
 	}
 
 	RECORD_SPEED("	Update particle info  %d ms \n");
+#endif
 
 #ifdef USE_KDTREE
 	//refresh kdtree periodically
@@ -183,12 +183,13 @@ double ParticleContainer::lambda(int index)
 
 Particle::vec3 ParticleContainer::getParticleForce(Particle pos)
 {
+	/*
 	// Simulate simple physics : gravity only, no collision;
 	if (pos.pos.y < 0)
 	{
 		pos.pos.y = 0;
 		return Particle::vec3(0, -pos.speed.y * 5, 0); //collision with ground
-	}
+	} */
 	return Particle::vec3(0, -9.81, 0);
 
 #ifdef SPHERE

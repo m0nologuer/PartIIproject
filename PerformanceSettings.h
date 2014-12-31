@@ -12,7 +12,7 @@
 #define MAX_THREADS 768
 #endif
 
-#define MAX_PARTICLE_COUNT 4096*8
+#define MAX_PARTICLE_COUNT 4096
 #define max_particle_count MAX_PARTICLE_COUNT
 
 #ifdef __cuda_cuda_h__
