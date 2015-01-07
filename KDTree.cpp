@@ -30,12 +30,14 @@ KDTree::KDTree(Particle* particle_container, int particle_count)
 	for (int i = 0; i < particle_count; i++)
 		if (particle_container[i].life > 0)
 			particles.push_back(&(particle_container[i]));
-	
+	printf("	KD Tree size: %d particles\n", particles.size());
+
 	//unrolled recursive process to stop stack overflow
 	root_node = new KDTree::Node();
 	KDTreeArgs tree_args(&particles, Axis::X_AXIS, root_node);
 	build_deque.push_back(tree_args);
-	//build the tree
+	//build the tree+		this	0x06176e58 {build_deque={ size=0 } traversal_deque={ size=0 } comp={ax=Y_AXIS | -842150452 (-842150451) } ...}	KDTree *
+
 	while (!build_deque.empty())
 	{
 		KDTreeArgs next_tree_args = build_deque.front();

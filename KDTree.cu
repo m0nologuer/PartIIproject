@@ -102,7 +102,7 @@ void KDTree::batchNeighbouringParticles_CUDA(const Node* n, double rad, const Pa
 {
 	// Launch the CUDA Kernel
 	int threadsPerBlock = n->blob_size; //so we can have one particle computed per block
-	int blocksPerGrid = min(n->blob_size, 65536 / n->blob_size)-1; //avoid overstepping max no. of threads
+	int blocksPerGrid = min(n->blob_size, 65536 / n->blob_size -1); //avoid overstepping max no. of threads
 	int offset = 0;
 	
 	//launch until all subsets have been considered

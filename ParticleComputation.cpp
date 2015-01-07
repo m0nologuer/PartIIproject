@@ -30,30 +30,19 @@ void ParticleContainer::applyPhysics(double delta)
 
 			//find neighbouring particles
 #ifdef USE_KDTREE
-#ifndef USE_CUDA
 			neighbours[i] = tree->findNeighbouringParticles(p, h);
-#endif
 #else
 			neighbours[i] = findNeighbouringParticles(p);
 #endif
 		}
 	}
 
-#ifdef USE_KDTREE
-#ifdef USE_CUDA
-	tree->batchNeighbouringParticles(h, container_CUDA, neighbours_CUDA); //parrell batch processing of neighbours
-#endif
-#endif
-	RECORD_SPEED("	Find neighbouring particles  %d ms \n");
-
-	//Perform collision detection, solving
-#ifdef USE_CUDA
-	solverIterations_CUDA();
-	RECORD_SPEED("	CUDA solver iteraions  %d ms \n");
-
-#else 
 	for (int i = 0; i < iteration_count; i++)
+	{
 		solverIteration();
+		printf("%f, %f, %f \n", container[i].predicted_pos.x, container[i].predicted_pos.y,
+			container[i].predicted_pos.z);
+	}
 	RECORD_SPEED("	Solver iteraions  %d ms \n");
 
 	//Update particle info
@@ -67,15 +56,9 @@ void ParticleContainer::applyPhysics(double delta)
 			container[i].predicted_pos.z);
 		if (!mesh->inside_mesh(new_point)) //only update it if inside the mesh
 		*/
-
-		//For particle sorting
-		Particle::vec3 c_vec = container[i].pos + (camera_pos * -1.0f);
-		container[i].cameradistance = sqrt(c_vec.x*c_vec.x + c_vec.y*c_vec.y + 
-			c_vec.z*c_vec.z);
 	}
 
 	RECORD_SPEED("	Update particle info  %d ms \n");
-#endif
 
 #ifdef USE_KDTREE
 	//refresh kdtree periodically

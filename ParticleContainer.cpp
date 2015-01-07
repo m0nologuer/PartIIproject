@@ -1,5 +1,5 @@
 #include "ParticleContainer.h"
-
+#include <iostream>
 #include <stdio.h>
 
 ParticleContainer::ParticleContainer()
@@ -96,7 +96,7 @@ void ParticleContainer::addNewParticles(double delta)
 {
 	//specified number of particles per time period;
 
-	for (int i = 0; i < particles_per_iteration; i++)
+	for (int i = 0; i < particles_per_iteration*delta; i++)
 	{ 
 		int index = getUnusedParticle();
 		Particle& p = container[index]; // shortcut
@@ -122,9 +122,6 @@ void ParticleContainer::addNewParticles(double delta)
 		p.b = 122;
 		p.a = 255;
 
-		//new particles added to back of camera queue
-		p.cameradistance = -1.0f;
-
 		last_particle_count = index;
 	}
 } 
@@ -133,59 +130,50 @@ void ParticleContainer::UpdateParticles(double delta)
 	int start_time = glutGet(GLUT_ELAPSED_TIME);
 	int time;
 
+#ifdef USE_CUDA
+	CUDAloop(delta);
+	RECORD_SPEED("CUDA loop %d ms \n");
+	for (int i = 0; i < max_particle_count; i++){
+		if (container[i].life > 0)
+		printf(" %d  \n", container[i].lambda);
+
+	}
+	render_counter = max_particle_count;
+
+#else
 	addNewParticles(delta);
 	RECORD_SPEED("Add new particles %d ms \n");
 
 	applyPhysics(delta);
 	RECORD_SPEED("Apply physics  %d ms \n");
 
-
 	render_counter = 0;
-
-	//for rendering blended particles
-	//std::sort(container, container + max_particle_count);
 
 	for (int i = 0; i< max_particle_count; i++){
 
 		Particle& p = container[i]; // shortcut
-
 		if (p.life > 0.0f){
-			// Decrease life
+
+			// Fill the GPU buffer
+			g_particle_position_data[4 * render_counter + 0] = p.pos.x;
+			g_particle_position_data[4 * render_counter + 1] = p.pos.y;
+			g_particle_position_data[4 * render_counter + 2] = p.pos.z;
+
+			g_particle_position_data[4 * render_counter + 3] = p.size;
+
+			g_particle_color_data[4 * render_counter + 0] = p.r;
+			g_particle_color_data[4 * render_counter + 1] = p.g;
+			g_particle_color_data[4 * render_counter + 2] = p.b;
+			g_particle_color_data[4 * render_counter + 3] = p.a;
+
+			render_counter++;
 			p.life -= delta;
 
-			//remove particles that have drifted out of view
-			if (Particle::vec3::dot(p.pos, p.pos) > 10000)
-				p.life = -1;
-
-			//change color
-			int col = rand() % 5;
-			int r = (p.r * 15 + colors[col][0]) / 16; p.r = (char)r;
-			int g = (p.g * 15 + colors[col][1]) / 16; p.g = (char)g;
-			int b = (p.b * 15 + colors[col][2]) / 16; p.b = (char)b;
-
-			if (p.life > 0.0f){			
-
-				// Fill the GPU buffer
-				g_particle_position_data[4 * render_counter + 0] = p.pos.x;
-				g_particle_position_data[4 * render_counter + 1] = p.pos.y;
-				g_particle_position_data[4 * render_counter + 2] = p.pos.z;
-
-				g_particle_position_data[4 * render_counter + 3] = p.size;
-
-				g_particle_color_data[4 * render_counter + 0] = p.r;
-				g_particle_color_data[4 * render_counter + 1] = p.g;
-				g_particle_color_data[4 * render_counter + 2] = p.b;
-				g_particle_color_data[4 * render_counter + 3] = p.a;
-
-				render_counter++;
-			}
-			else{
-				// Particles that just died will be put at the end of the buffer in SortParticles();
-				p.cameradistance = -1.0f;
-			}
-
 		}
-	}
 
+	}
 	RECORD_SPEED("Copy to buffer  %d ms \n");
+	printf("Finished with %d active particles \n", render_counter)
+#endif
+
 }

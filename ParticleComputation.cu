@@ -7,6 +7,59 @@
 #include "ParticleContainer.h"
 #ifdef USE_CUDA  
 
+void ParticleContainer::CUDAloop(double delta)
+{
+	int start_time = glutGet(GLUT_ELAPSED_TIME);
+	int time;
+
+	//start by building the k-D tree if we don't have one
+	if (!tree)
+	{
+		tree = new KDTree(container, max_particle_count);
+	}
+	RECORD_SPEED("	Build K-D tree  %d ms \n");
+
+	//parrell batch processing of neighbours
+	tree->batchNeighbouringParticles(h, container_CUDA, neighbours_CUDA);
+	RECORD_SPEED("	Find neighbouring particles  %d ms \n");
+
+	size_t mem_size = sizeof(Particle) * MAX_PARTICLE_COUNT;
+	gpuErrchk(cudaMemcpy(container, container_CUDA, mem_size, cudaMemcpyDeviceToHost));
+
+	//Perform collision detection, solving
+	solverIterations_CUDA(delta);
+	RECORD_SPEED("	CUDA solver iteraions  %d ms \n");
+
+	mem_size = sizeof(Particle) * MAX_PARTICLE_COUNT;
+	gpuErrchk(cudaMemcpy(container, container_CUDA, mem_size, cudaMemcpyDeviceToHost));
+
+
+	//apply forces, generate new particles
+	updateParticles_CUDA(delta);
+	RECORD_SPEED("	Update particles  %d ms \n");
+
+	mem_size = sizeof(Particle) * MAX_PARTICLE_COUNT;
+	gpuErrchk(cudaMemcpy(container, container_CUDA, mem_size, cudaMemcpyDeviceToHost));
+
+	//copy to GPU buffer
+	mem_size = sizeof(GLfloat) * MAX_PARTICLE_COUNT * 4;
+	gpuErrchk(cudaMemcpy(g_particle_position_data, positions_CUDA, mem_size, cudaMemcpyDeviceToHost));
+	mem_size = sizeof(GLubyte) * MAX_PARTICLE_COUNT * 4;
+	gpuErrchk(cudaMemcpy(g_particle_color_data, colors_CUDA, mem_size, cudaMemcpyDeviceToHost));
+
+	//refresh kdtree periodically
+	if (rand() % 5 == 0)
+	{
+		//copy the data back
+		mem_size = sizeof(Particle) * MAX_PARTICLE_COUNT;
+		gpuErrchk(cudaMemcpy(container, container_CUDA, mem_size, cudaMemcpyDeviceToHost));
+		RECORD_SPEED("	Copy data back  %d ms \n");
+
+		delete tree;
+		tree = NULL;
+	}
+
+}
 extern "C" __device__ float W_poly6_cuda(Particle::vec3 r, float h)
 {
 	double radius = r.x*r.x + r.y*r.y + r.z*r.z;
@@ -68,9 +121,86 @@ extern "C" __device__ Particle::vec3 dW_spiky_cuda(Particle::vec3 r, float h)
 		return zero;
 	}
 }
-extern "C" __global__ void solverIterationPositions(Particle *particles)
+extern "C" __device__  void applyForce(Particle& p, float delta)
 {
+	p.speed.x += 0;
+	p.speed.y += - 9.81* delta;
+	p.speed.z += 0;
+};
+extern "C" __global__ void updateParticles(float delta, Particle *particles, GLfloat* positions, GLubyte* colors,
+	int scramble)
+{
+	int i = blockDim.x * blockIdx.x + threadIdx.x; //thread id, from 0 to MAX_PARTICL E_COUNT
 
+	if (i < MAX_PARTICLE_COUNT)
+	{
+		Particle& p = particles[i];
+
+		if (p.life > 0)
+		{
+			p.life -= delta;
+
+			//For render buffer
+			positions[4 * i] = p.pos.x;
+			positions[4 * i + 1] = p.pos.y;
+			positions[4 * i + 2] = p.pos.z;
+			positions[4 * i + 3] = p.size;
+			colors[4 * i] = p.r;
+			colors[4 * i + 1] = p.g;
+			colors[4 * i + 2] = p.b;
+			colors[4 * i + 3] = p.a;
+
+			// update position and speed, apply physics force
+			p.speed.x = (p.predicted_pos.x - p.pos.x ) *(1 / delta);
+			p.speed.y = (p.predicted_pos.y - p.pos.y ) *(1 / delta);
+			p.speed.z = (p.predicted_pos.z - p.pos.z ) *(1 / delta);
+			p.pos.x = p.predicted_pos.x;
+			p.pos.y = p.predicted_pos.y;
+			p.pos.z = p.predicted_pos.z;
+
+			//for next frame
+			applyForce(p, delta);
+			p.predicted_pos.x = p.pos.x + p.speed.x * delta;
+			p.predicted_pos.y = p.pos.y + p.speed.y * delta;
+			p.predicted_pos.z = p.pos.z + p.speed.z * delta;
+		}
+		else
+		{
+			// move it out of the viewing frustrum
+			positions[4 * i] = -1000;
+			if ((i * scramble) % 100 < 1) //one hundreth of the remaining particles are brought to life
+			{
+
+				double theta = ((i * scramble) % 628)*0.01;
+				double phi = ((i * scramble * scramble) % 314)*0.01;
+
+				p.pos.x = sin(phi)*cos(theta) * 10;
+				p.pos.y = cos(phi)*cos(theta) + 50;
+				p.pos.z = sin(phi)*sin(theta) * 10;
+
+				p.speed.x = theta;
+				p.speed.y = -((i * scramble) % 45 + 155);
+				p.speed.z = phi;
+
+				p.predicted_pos.x = p.pos.x + p.speed.x * delta;
+				p.predicted_pos.y = p.pos.y + p.speed.y * delta;
+				p.predicted_pos.z = p.pos.z + p.speed.z * delta;
+
+				p.life = 1.0f; //lasts 1 second
+
+				//setting misc parameters randomly for now
+				p.size = (((i * scramble) % 1000) / 2000.0f + 0.1f)*0.05;
+				p.angle = ((i * scramble * scramble) % 100)*0.01;
+				p.weight = ((i * scramble * scramble * scramble) % 100)*0.01;
+
+				//start color
+				p.r = 83;
+				p.g = 119;
+				p.b = 122;
+				p.a = 255;
+			}
+		}
+	}
 }
 extern "C" __global__ void solverIterationPositions(Particle *particles, const int *neighbour_indexes,
 	float h, float Wq, float corr_k, int n)
@@ -80,7 +210,6 @@ extern "C" __global__ void solverIterationPositions(Particle *particles, const i
 	//sort out indexes
 	int id = blockDim.x * blockIdx.x + threadIdx.x; //thread id, from 0 to MAX_PARTICLE_COUNT * MAX_NEIGHBOURS
 	int particle_index = id / MAX_NEIGHBOURS; //the particle we sum at
-	int neighbour_index = id % MAX_NEIGHBOURS; //the particle we sum at
 	if (particle_index > MAX_PARTICLE_COUNT)
 		return;
 	int storage_index = threadIdx.x;
@@ -92,7 +221,7 @@ extern "C" __global__ void solverIterationPositions(Particle *particles, const i
 		return;
 
 	int particle_neighbour_index = neighbour_indexes[id];
-	if (neighbour_index < 0) //if there's no neighbour at this location
+	if (particle_neighbour_index < 0) //if there's no neighbour at this location
 	{
 		predicted_pos_contributions[storage_index].x = 0;
 		predicted_pos_contributions[storage_index].y = 0;
@@ -110,10 +239,12 @@ extern "C" __global__ void solverIterationPositions(Particle *particles, const i
 		double s_corr = W_poly6_cuda(distance, h) / Wq;
 		s_corr = -corr_k * pow(s_corr, n);
 
+		float multiplier = (pi.lambda + pj.lambda + s_corr);
+
 		predicted_pos_contributions[storage_index] = dW_spiky_cuda(distance, h);
-		predicted_pos_contributions[storage_index].x *= (pi.lambda + pj.lambda + s_corr);
-		predicted_pos_contributions[storage_index].y *= (pi.lambda + pj.lambda + s_corr);
-		predicted_pos_contributions[storage_index].z *= (pi.lambda + pj.lambda + s_corr);
+		predicted_pos_contributions[storage_index].x *= multiplier;
+		predicted_pos_contributions[storage_index].y *= multiplier;
+		predicted_pos_contributions[storage_index].z *= multiplier;
  	}
 	__syncthreads();
 
@@ -142,7 +273,6 @@ extern "C" __global__ void solverIterationLambdas(Particle *particles, const int
 	//sort out indexes
 	int id = blockDim.x * blockIdx.x + threadIdx.x; //thread id, from 0 to MAX_PARTICLE_COUNT * MAX_NEIGHBOURS
 	int particle_index = id / MAX_NEIGHBOURS; //the particle we sum at
-	int neighbour_index = id % MAX_NEIGHBOURS; //the particle we sum at
 	if (particle_index > MAX_PARTICLE_COUNT)
 		return;
 	int storage_index = threadIdx.x;
@@ -154,7 +284,7 @@ extern "C" __global__ void solverIterationLambdas(Particle *particles, const int
 		return;
 
 	int particle_neighbour_index = neighbour_indexes[id];
-	if (neighbour_index < 0) //if there's no neighbour at this location
+	if (particle_neighbour_index < 0) //if there's no neighbour at this location
 	{
 		lambda_numerators[storage_index] = 0;
 		lambda_denominators[storage_index] = 0;
@@ -186,36 +316,58 @@ extern "C" __global__ void solverIterationLambdas(Particle *particles, const int
 		}
 		numerator = numerator / p0 - 1;
 		denominator = denominator / p0;
-		particles[particle_index].lambda = numerator / denominator;
+		if (denominator > EPSILON)
+			particles[particle_index].lambda = 0;
+		else
+			particles[particle_index].lambda = numerator / denominator;
 	}
-}
+} 
 
 void ParticleContainer::intialize_CUDA()
 {
 	size_t mem_size = sizeof(Particle) * MAX_PARTICLE_COUNT;
 	gpuErrchk(cudaMalloc((void **)&container_CUDA, mem_size));
+	gpuErrchk(cudaMemcpy(container_CUDA, container, mem_size, cudaMemcpyHostToDevice));
+	mem_size = sizeof(int) * MAX_PARTICLE_COUNT * MAX_NEIGHBOURS;
 
 	mem_size = sizeof(int) * MAX_PARTICLE_COUNT * MAX_NEIGHBOURS;
 	neighbour_array = (int*)malloc(mem_size);
 	gpuErrchk(cudaMalloc((void **)&neighbours_CUDA, mem_size));
+
+	//for copying to renderbuffers
+	mem_size = sizeof(GLfloat) * MAX_PARTICLE_COUNT * 4;
+	gpuErrchk(cudaMalloc((void **)&positions_CUDA, mem_size));
+	gpuErrchk(cudaMemset((void **)&positions_CUDA,0, mem_size));
+
+	mem_size = sizeof(GLubyte) * MAX_PARTICLE_COUNT * 4;
+	gpuErrchk(cudaMalloc((void **)&colors_CUDA, mem_size));
 } 
 void ParticleContainer::cleanup_CUDA()
 {
 	free(neighbour_array);
 	gpuErrchk(cudaFree((void **)&container_CUDA));
 	gpuErrchk(cudaFree((void **)&neighbours_CUDA));
+	gpuErrchk(cudaFree((void **)&colors_CUDA));
+	gpuErrchk(cudaFree((void **)&positions_CUDA));
 }
-void ParticleContainer::solverIterations_CUDA(void)
+void ParticleContainer::updateParticles_CUDA(double delta)
 {
 	int start_time = glutGet(GLUT_ELAPSED_TIME);
 	int time;
-	//copy the data across
-	size_t mem_size = sizeof(Particle) * MAX_PARTICLE_COUNT;
-	gpuErrchk(cudaMemcpy(container_CUDA,container, mem_size, cudaMemcpyHostToDevice));
-	//mem_size = sizeof(int) * MAX_PARTICLE_COUNT * MAX_NEIGHBOURS;
-	//gpuErrchk(cudaMemcpy(neighbours_CUDA,neighbour_array, mem_size, cudaMemcpyHostToDevice));
+	//update particles for next iteration
+	int threadsPerBlock = THREADS_PER_BLOCK;
+	int blocksPerGrid = MAX_PARTICLE_COUNT / THREADS_PER_BLOCK + 1;
+	updateParticles << <blocksPerGrid, threadsPerBlock >> >(delta, container_CUDA,
+		positions_CUDA, colors_CUDA, rand());
 
-	RECORD_SPEED("		Copy data across  %d ms \n");
+	//Error handling
+	gpuErrchk(cudaDeviceSynchronize());
+	gpuErrchk(cudaGetLastError());
+}
+void ParticleContainer::solverIterations_CUDA(float delta)
+{
+	int start_time = glutGet(GLUT_ELAPSED_TIME);
+	int time;
 
 	//kernel properties
 	int threadsPerBlock = THREADS_PER_BLOCK; //so we can have  multiple blocks on processors
@@ -237,13 +389,5 @@ void ParticleContainer::solverIterations_CUDA(void)
 		gpuErrchk(cudaDeviceSynchronize());
 		gpuErrchk(cudaGetLastError());
 	}
-
-	RECORD_SPEED("		Kernel iterations  %d ms \n");
-
-	//copy the data back
-	mem_size = sizeof(Particle) * MAX_PARTICLE_COUNT;
-	gpuErrchk(cudaMemcpy(container, container_CUDA, mem_size, cudaMemcpyDeviceToHost));
-
-	RECORD_SPEED("		Copy data back  %d ms \n");
 }
 #endif

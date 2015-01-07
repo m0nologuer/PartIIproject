@@ -47,11 +47,15 @@ public:
 private:
 #ifdef USE_CUDA
 	//CUDA accelerated physics
+	void CUDAloop(double delta);
+	void updateParticles_CUDA(double delta);
 	void intialize_CUDA();
-	void solverIterations_CUDA();
+	void solverIterations_CUDA(float delta);
 	void cleanup_CUDA();
 
 	//CUDA variables
+	GLfloat* positions_CUDA;
+	GLubyte* colors_CUDA;
 	Particle* container_CUDA;
 	int* neighbours_CUDA;
 	int* neighbour_array;
@@ -67,7 +71,7 @@ private:
 	float q;
 	float e0;
 	float p0;
-
+ 
 	char colors[5][3];
 
 	Particle container[max_particle_count];
