@@ -107,7 +107,7 @@ void ParticleContainer::addNewParticles(double delta)
 
 		p.pos = Particle::vec3(sin(phi)*cos(theta) * 10, cos(phi)*cos(theta) + 50,
 			sin(phi)*sin(theta) * 10);
-		p.speed = Particle::vec3(theta, -(rand() % 45 + 155), phi);
+		p.speed = Particle::vec3(0,-100,0);
 			//p.pos *-0.05;
 		p.life = life; //lasts 1 second
 
@@ -163,8 +163,12 @@ void ParticleContainer::UpdateParticles(double delta)
 			int g = (p.g * 15 + colors[col][1]) / 16; p.g = (char)g;
 			int b = (p.b * 15 + colors[col][2]) / 16; p.b = (char)b;
 
-			if (p.life > 0.0f){			
+			p.r = (char)(p.speed.x*30 + 125);
+			p.g = (char)(p.speed.y + 125);
+			p.b = (char)(p.speed.z*30 + 125);
 
+			if (p.life > 0.0f){			
+				
 				// Fill the GPU buffer
 				g_particle_position_data[4 * render_counter + 0] = p.pos.x;
 				g_particle_position_data[4 * render_counter + 1] = p.pos.y;

@@ -68,10 +68,6 @@ extern "C" __device__ Particle::vec3 dW_spiky_cuda(Particle::vec3 r, float h)
 		return zero;
 	}
 }
-extern "C" __global__ void solverIterationPositions(Particle *particles)
-{
-
-}
 extern "C" __global__ void solverIterationPositions(Particle *particles, const int *neighbour_indexes,
 	float h, float Wq, float corr_k, int n)
 {
@@ -80,7 +76,6 @@ extern "C" __global__ void solverIterationPositions(Particle *particles, const i
 	//sort out indexes
 	int id = blockDim.x * blockIdx.x + threadIdx.x; //thread id, from 0 to MAX_PARTICLE_COUNT * MAX_NEIGHBOURS
 	int particle_index = id / MAX_NEIGHBOURS; //the particle we sum at
-	int neighbour_index = id % MAX_NEIGHBOURS; //the particle we sum at
 	if (particle_index > MAX_PARTICLE_COUNT)
 		return;
 	int storage_index = threadIdx.x;
@@ -92,7 +87,7 @@ extern "C" __global__ void solverIterationPositions(Particle *particles, const i
 		return;
 
 	int particle_neighbour_index = neighbour_indexes[id];
-	if (neighbour_index < 0) //if there's no neighbour at this location
+	if (particle_neighbour_index < 0) //if there's no neighbour at this location
 	{
 		predicted_pos_contributions[storage_index].x = 0;
 		predicted_pos_contributions[storage_index].y = 0;

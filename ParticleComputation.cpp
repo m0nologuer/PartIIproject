@@ -55,7 +55,7 @@ void ParticleContainer::applyPhysics(double delta)
 	for (int i = 0; i < iteration_count; i++)
 		solverIteration();
 	RECORD_SPEED("	Solver iteraions  %d ms \n");
-
+#endif
 	//Update particle info
 	for (int i = 0; i < max_particle_count; i++){
 		container[i].speed = (container[i].predicted_pos - container[i].pos * 1.0) *(1 / delta);
@@ -75,7 +75,6 @@ void ParticleContainer::applyPhysics(double delta)
 	}
 
 	RECORD_SPEED("	Update particle info  %d ms \n");
-#endif
 
 #ifdef USE_KDTREE
 	//refresh kdtree periodically
