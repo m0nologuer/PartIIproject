@@ -70,7 +70,7 @@ class KDTree
 
 	//finding the correct particle
 	void batchNeighbouringParticles_CUDA(const Node* n, double rad,
-		const Particle* particles_CUDA, int* neighbours_CUDA);
+		 float* particles_CUDA, int* neighbours_CUDA);
 #endif
 
 public:
@@ -78,7 +78,8 @@ public:
 	~KDTree();
 	std::vector<Particle*> findNeighbouringParticles(Particle p, double rad);
 #ifdef USE_CUDA
-	void batchNeighbouringParticles(double rad, const Particle* particles_CUDA, int* neighbours_CUDA);
+	static KDTree* treeFromFloats(float* particle_positions, int particle_count);
+	void batchNeighbouringParticles(double rad, float* particle_pos_CUDA, int* neighbours_CUDA);
 #endif
 };
 

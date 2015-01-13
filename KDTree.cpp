@@ -36,7 +36,7 @@ KDTree::KDTree(Particle* particle_container, int particle_count)
 	root_node = new KDTree::Node();
 	KDTreeArgs tree_args(&particles, Axis::X_AXIS, root_node);
 	build_deque.push_back(tree_args);
-	//build the tree+		this	0x06176e58 {build_deque={ size=0 } traversal_deque={ size=0 } comp={ax=Y_AXIS | -842150452 (-842150451) } ...}	KDTree *
+	//build the tree
 
 	while (!build_deque.empty())
 	{
@@ -159,6 +159,21 @@ std::vector<Particle*> KDTree::findNeighbouringParticles(Particle p, double rad)
 	}
 	return empty_list;
 }
+#ifdef USE_CUDA
+KDTree* KDTree::treeFromFloats(float* particle_positions, int particle_count){
+	Particle* p_container = new Particle[particle_count];
+	for (int i = 0; i < particle_count; i++)
+	{
+		p_container[i].pos = Particle::vec3(particle_positions[4 * i], particle_positions[4 * i + 1],
+			particle_positions[4 * i + 2]);
+		p_container[i].life = (p_container[i].pos.x > -900);
+	}
+		
+	KDTree* tree = new KDTree(p_container, particle_count);
+	delete p_container;
+	return tree;
+}
+#endif
 KDTree::~KDTree()
 {
 	//disassemble tree

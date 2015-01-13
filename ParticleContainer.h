@@ -17,7 +17,6 @@ using namespace std;
 #define h_6 (h_squared*h_squared*h_squared)
 #define h_9 (h_squared*h_squared*h_squared*h_squared*h)
 
-#define USE_KDTREE 
 
 class ParticleContainer
 {
@@ -56,13 +55,22 @@ private:
 	//CUDA variables
 	GLfloat* positions_CUDA;
 	GLubyte* colors_CUDA;
-	Particle* container_CUDA;
+
+	//for particle movement & solvers
+	float* particle_positions_CUDA;
+	float* particle_speeds_CUDA;
+	float* particle_lambdas_CUDA;
+	float* particle_life_CUDA;
+	float* particle_predicted_pos_CUDA;
+
+	//determine neihgbours
 	int* neighbours_CUDA;
-	int* neighbour_array;
+	int neighbours_array[max_particle_count];
+	float lambdas_array[max_particle_count];
 #endif
 
-	static const int particles_per_iteration = 200;
-	static const int iteration_count = 25;
+	static const int particles_per_iteration = 600;
+	static const int iteration_count = 10;
 	static const int life = 5.0f;
 
 	float Wq;

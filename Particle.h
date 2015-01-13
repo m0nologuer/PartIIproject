@@ -1,5 +1,5 @@
 
-struct Particle{
+ struct Particle{
 	struct vec3{
 		double x;
 		double y;

@@ -131,13 +131,7 @@ void ParticleContainer::UpdateParticles(double delta)
 	int time;
 
 #ifdef USE_CUDA
-	CUDAloop(delta);
-	RECORD_SPEED("CUDA loop %d ms \n");
-	for (int i = 0; i < max_particle_count; i++){
-		if (container[i].life > 0)
-		printf(" %d  \n", container[i].lambda);
-
-	}
+	CUDAloop(delta*0.01);
 	render_counter = max_particle_count;
 
 #else
@@ -173,7 +167,7 @@ void ParticleContainer::UpdateParticles(double delta)
 
 	}
 	RECORD_SPEED("Copy to buffer  %d ms \n");
-	printf("Finished with %d active particles \n", render_counter)
+	printf("Finished with %d active particles \n", render_counter);
 #endif
 
 }

@@ -12,49 +12,40 @@ void ParticleContainer::CUDAloop(double delta)
 	int start_time = glutGet(GLUT_ELAPSED_TIME);
 	int time;
 
+	//apply forces, generate new particles
+	updateParticles_CUDA(delta);
+	RECORD_SPEED("	Update particles  %d ms \n");
+
+	//copy to GPU buffer
+	size_t mem_size = sizeof(GLfloat) * MAX_PARTICLE_COUNT * 4;
+	gpuErrchk(cudaMemcpy(g_particle_position_data, positions_CUDA, mem_size, cudaMemcpyDeviceToHost));
+	mem_size = sizeof(GLubyte) * MAX_PARTICLE_COUNT * 4;
+	gpuErrchk(cudaMemcpy(g_particle_color_data, colors_CUDA, mem_size, cudaMemcpyDeviceToHost));
+
 	//start by building the k-D tree if we don't have one
 	if (!tree)
 	{
-		tree = new KDTree(container, max_particle_count);
+		tree = KDTree::treeFromFloats(g_particle_position_data, MAX_PARTICLE_COUNT);
+		RECORD_SPEED("	Build K-D tree  %d ms \n");
 	}
-	RECORD_SPEED("	Build K-D tree  %d ms \n");
-
+	
 	//parrell batch processing of neighbours
-	tree->batchNeighbouringParticles(h, container_CUDA, neighbours_CUDA);
+	tree->batchNeighbouringParticles(h, positions_CUDA, neighbours_CUDA);
 	RECORD_SPEED("	Find neighbouring particles  %d ms \n");
 
-	size_t mem_size = sizeof(Particle) * MAX_PARTICLE_COUNT;
-	gpuErrchk(cudaMemcpy(container, container_CUDA, mem_size, cudaMemcpyDeviceToHost));
+	mem_size = sizeof(int) * MAX_PARTICLE_COUNT * MAX_NEIGHBOURS;
+	gpuErrchk(cudaMemcpy(neighbours_array, neighbours_CUDA, mem_size, cudaMemcpyDeviceToHost));
 
 	//Perform collision detection, solving
 	solverIterations_CUDA(delta);
 	RECORD_SPEED("	CUDA solver iteraions  %d ms \n");
 
-	mem_size = sizeof(Particle) * MAX_PARTICLE_COUNT;
-	gpuErrchk(cudaMemcpy(container, container_CUDA, mem_size, cudaMemcpyDeviceToHost));
-
-
-	//apply forces, generate new particles
-	updateParticles_CUDA(delta);
-	RECORD_SPEED("	Update particles  %d ms \n");
-
-	mem_size = sizeof(Particle) * MAX_PARTICLE_COUNT;
-	gpuErrchk(cudaMemcpy(container, container_CUDA, mem_size, cudaMemcpyDeviceToHost));
-
-	//copy to GPU buffer
-	mem_size = sizeof(GLfloat) * MAX_PARTICLE_COUNT * 4;
-	gpuErrchk(cudaMemcpy(g_particle_position_data, positions_CUDA, mem_size, cudaMemcpyDeviceToHost));
-	mem_size = sizeof(GLubyte) * MAX_PARTICLE_COUNT * 4;
-	gpuErrchk(cudaMemcpy(g_particle_color_data, colors_CUDA, mem_size, cudaMemcpyDeviceToHost));
+	mem_size = sizeof(float) * MAX_PARTICLE_COUNT;
+	gpuErrchk(cudaMemcpy(lambdas_array, particle_lambdas_CUDA, mem_size, cudaMemcpyDeviceToHost));
 
 	//refresh kdtree periodically
 	if (rand() % 5 == 0)
 	{
-		//copy the data back
-		mem_size = sizeof(Particle) * MAX_PARTICLE_COUNT;
-		gpuErrchk(cudaMemcpy(container, container_CUDA, mem_size, cudaMemcpyDeviceToHost));
-		RECORD_SPEED("	Copy data back  %d ms \n");
-
 		delete tree;
 		tree = NULL;
 	}
@@ -121,89 +112,78 @@ extern "C" __device__ Particle::vec3 dW_spiky_cuda(Particle::vec3 r, float h)
 		return zero;
 	}
 }
-extern "C" __device__  void applyForce(Particle& p, float delta)
+extern "C" __device__  void applyForce(float* speed , float delta)
 {
-	p.speed.x += 0;
-	p.speed.y += - 9.81* delta;
-	p.speed.z += 0;
+	speed[0] += 0;
+	speed[1] += -9.81* delta;
+	speed[2] += 0;
 };
-extern "C" __global__ void updateParticles(float delta, Particle *particles, GLfloat* positions, GLubyte* colors,
-	int scramble)
+
+extern "C" __global__ void updateParticles(float delta, float *pos, float* predicted_pos, float* speed,
+	float* life, GLfloat* GL_positions, GLubyte* GL_colors, int scramble)
 {
 	int i = blockDim.x * blockIdx.x + threadIdx.x; //thread id, from 0 to MAX_PARTICL E_COUNT
 
 	if (i < MAX_PARTICLE_COUNT)
 	{
-		Particle& p = particles[i];
-
-		if (p.life > 0)
+	
+		if (life[i]> 0)
 		{
-			p.life -= delta;
+			life[i] -= delta;
 
 			//For render buffer
-			positions[4 * i] = p.pos.x;
-			positions[4 * i + 1] = p.pos.y;
-			positions[4 * i + 2] = p.pos.z;
-			positions[4 * i + 3] = p.size;
-			colors[4 * i] = p.r;
-			colors[4 * i + 1] = p.g;
-			colors[4 * i + 2] = p.b;
-			colors[4 * i + 3] = p.a;
+			GL_positions[4 * i] = pos[3 * i];
+			GL_positions[4 * i + 1] = pos[3 * i + 1];
+			GL_positions[4 * i + 2] = pos[3 * i + 2];
+			GL_positions[4 * i + 3] = 0.02;
+			GL_colors[4 * i] = 125;
+			GL_colors[4 * i + 1] = 84;
+			GL_colors[4 * i + 2] = 84;
+			GL_colors[4 * i + 3] = 255;
 
 			// update position and speed, apply physics force
-			p.speed.x = (p.predicted_pos.x - p.pos.x ) *(1 / delta);
-			p.speed.y = (p.predicted_pos.y - p.pos.y ) *(1 / delta);
-			p.speed.z = (p.predicted_pos.z - p.pos.z ) *(1 / delta);
-			p.pos.x = p.predicted_pos.x;
-			p.pos.y = p.predicted_pos.y;
-			p.pos.z = p.predicted_pos.z;
-
+			for (int j = 0; j < 3; j++)
+			{
+				speed[3 * i + j] = (predicted_pos[3 * i + j] - pos[3 * i + j])*(1 / delta);
+				pos[3 * i + j] = predicted_pos[3 * i + j];
+			}
 			//for next frame
-			applyForce(p, delta);
-			p.predicted_pos.x = p.pos.x + p.speed.x * delta;
-			p.predicted_pos.y = p.pos.y + p.speed.y * delta;
-			p.predicted_pos.z = p.pos.z + p.speed.z * delta;
+			applyForce(&speed[3 * i], delta);
+			for (int j = 0; j < 3; j++)
+				predicted_pos[3 * i + j] = pos[3 * i + j] + speed[3 * i + j] * delta;
+
+			//kill particles out of the viewing frustrum
+			if (abs(pos[3 * i]) > 200 || abs(pos[3 * i + 1]) > 200)
+				life[i] = -1;
 		}
 		else
 		{
 			// move it out of the viewing frustrum
-			positions[4 * i] = -1000;
-			if ((i * scramble) % 100 < 1) //one hundreth of the remaining particles are brought to life
+			GL_positions[4 * i] = -1000;
+			if ((i * scramble) % 103 < 20) //one half of the remaining particles are brought to life
 			{
 
 				double theta = ((i * scramble) % 628)*0.01;
 				double phi = ((i * scramble * scramble) % 314)*0.01;
 
-				p.pos.x = sin(phi)*cos(theta) * 10;
-				p.pos.y = cos(phi)*cos(theta) + 50;
-				p.pos.z = sin(phi)*sin(theta) * 10;
+				pos[3 * i] = sin(phi)*cos(theta) * 10;
+				pos[3 * i + 1] = cos(phi)*cos(theta) + 50;
+				pos[3 * i + 2] = sin(phi)*sin(theta) * 10;
 
-				p.speed.x = theta;
-				p.speed.y = -((i * scramble) % 45 + 155);
-				p.speed.z = phi;
+				speed[3 * i] = theta;
+				speed[3 * i + 1] = -((i * scramble) % 45 + 155);
+				speed[3 * i + 2] = phi;
 
-				p.predicted_pos.x = p.pos.x + p.speed.x * delta;
-				p.predicted_pos.y = p.pos.y + p.speed.y * delta;
-				p.predicted_pos.z = p.pos.z + p.speed.z * delta;
+				for (int j = 0; j < 3; j++)
+					predicted_pos[3 * i + j] = pos[3 * i + j] + speed[3 * i + j] * delta;
 
-				p.life = 1.0f; //lasts 1 second
-
-				//setting misc parameters randomly for now
-				p.size = (((i * scramble) % 1000) / 2000.0f + 0.1f)*0.05;
-				p.angle = ((i * scramble * scramble) % 100)*0.01;
-				p.weight = ((i * scramble * scramble * scramble) % 100)*0.01;
-
-				//start color
-				p.r = 83;
-				p.g = 119;
-				p.b = 122;
-				p.a = 255;
+				life[i] = 5.0f; //lasts 1 second
 			}
 		}
 	}
-}
-extern "C" __global__ void solverIterationPositions(Particle *particles, const int *neighbour_indexes,
-	float h, float Wq, float corr_k, int n)
+} 
+extern "C" __global__ void solverIterationPositions(float* predicted_pos, float* life, float* lambdas,
+	const int *neighbour_indexes, float h, float Wq, float corr_k,float p0, int n)
 {
 	__shared__ Particle::vec3 predicted_pos_contributions[THREADS_PER_BLOCK];
 
@@ -216,8 +196,7 @@ extern "C" __global__ void solverIterationPositions(Particle *particles, const i
 	bool reducer = threadIdx.x % MAX_NEIGHBOURS == 0;
 
 	//calculate contributions to positions
-	Particle pi = particles[particle_index];
-	if (!(pi.life > 0))
+	if (!(life[particle_index] > 0))
 		return;
 
 	int particle_neighbour_index = neighbour_indexes[id];
@@ -229,17 +208,18 @@ extern "C" __global__ void solverIterationPositions(Particle *particles, const i
 	}
 	else
 	{
-		Particle pj = particles[particle_neighbour_index]; //indexing by rows and columns
-		
+		float* pi = predicted_pos + particle_index * 3; //indexing by rows and columns
+		float* pj = predicted_pos + particle_neighbour_index * 3; //indexing by rows and columns
 		Particle::vec3 distance;
-		distance.x = (pi.predicted_pos.x - pj.predicted_pos.x);
-		distance.y = (pi.predicted_pos.y - pj.predicted_pos.y);
-		distance.z = (pi.predicted_pos.z - pj.predicted_pos.z);
+		distance.x = pi[0] - pj[0];
+		distance.y = pi[1] - pj[1];
+		distance.z = pi[2] - pj[2];
 
+		
 		double s_corr = W_poly6_cuda(distance, h) / Wq;
 		s_corr = -corr_k * pow(s_corr, n);
 
-		float multiplier = (pi.lambda + pj.lambda + s_corr);
+		float multiplier = (lambdas[particle_index] + lambdas[particle_neighbour_index] + s_corr) / p0;
 
 		predicted_pos_contributions[storage_index] = dW_spiky_cuda(distance, h);
 		predicted_pos_contributions[storage_index].x *= multiplier;
@@ -257,14 +237,14 @@ extern "C" __global__ void solverIterationPositions(Particle *particles, const i
 			y += predicted_pos_contributions[storage_index + j].y;
 			z += predicted_pos_contributions[storage_index + j].z;
 		}
-		particles[particle_index].predicted_pos.x = x;
-		particles[particle_index].predicted_pos.y = y;
-		particles[particle_index].predicted_pos.z = z;
+		predicted_pos[3 * particle_index] += x;
+		predicted_pos[3 * particle_index + 1] += y;
+		predicted_pos[3 * particle_index + 2] += z;
 
 	}
 }
-extern "C" __global__ void solverIterationLambdas(Particle *particles, const int *neighbour_indexes,
-	float p0, float h)
+extern "C" __global__ void solverIterationLambdas(float *predicted_pos, const float* life, 
+	 float* speed, float* lambda, const int *neighbour_indexes, float p0, float h, float e0)
 {
 	//data shared between each block
 	__shared__ float lambda_numerators[THREADS_PER_BLOCK];
@@ -279,8 +259,7 @@ extern "C" __global__ void solverIterationLambdas(Particle *particles, const int
 	bool reducer = threadIdx.x % MAX_NEIGHBOURS == 0;
 	
 	//calculate contributions to lambda
-	Particle pi = particles[particle_index];
-	if (!(pi.life > 0))
+	if (!(life[particle_index] > 0))
 		return;
 
 	int particle_neighbour_index = neighbour_indexes[id];
@@ -291,73 +270,93 @@ extern "C" __global__ void solverIterationLambdas(Particle *particles, const int
 	}
 	else
 	{
-		Particle pj = particles[particle_neighbour_index]; //indexing by rows and columns
+		float* pi = predicted_pos + particle_index * 3; //indexing by rows and columns
+		float* pj = predicted_pos + particle_neighbour_index * 3; //indexing by rows and columns
 		Particle::vec3 distance; 
-		distance.x = (pi.predicted_pos.x - pj.predicted_pos.x);
-		distance.y = (pi.predicted_pos.y - pj.predicted_pos.y);
-		distance.z = (pi.predicted_pos.z - pj.predicted_pos.z);
+		distance.x = pi[0] - pj[0];
+		distance.y = pi[1] - pj[1];
+		distance.z = pi[2] - pj[2];
 
 		lambda_numerators[storage_index] = W_poly6_cuda(distance, h);
 
+		float* pj_speed = speed + particle_neighbour_index * 3; //indexing by rows and columns
+
 		Particle::vec3 d_distance = dW_poly6_cuda(distance, h);
-		lambda_denominators[storage_index] = -d_distance.x * pj.speed.x + d_distance.y * pj.speed.y
-			+ d_distance.z * pj.speed.z;
+		lambda_denominators[storage_index] = -(d_distance.x * pj_speed[0] + d_distance.y * pj_speed[1]
+			+ d_distance.z * pj_speed[2]);
 	}
 	__syncthreads();
 	
 	//reduction
 	if (reducer)
-	{
-		float numerator, denominator = 0;
+	{		
+		float numerator = 0;
+		float denominator = e0;
 		for (int j = 0; j < MAX_NEIGHBOURS; j++)
 		{
 			numerator += lambda_numerators[storage_index + j];
-			denominator += lambda_denominators[storage_index + j];
+			denominator += lambda_denominators[storage_index + j] * lambda_denominators[storage_index + j];
 		}
 		numerator = numerator / p0 - 1;
 		denominator = denominator / p0;
-		if (denominator > EPSILON)
-			particles[particle_index].lambda = 0;
-		else
-			particles[particle_index].lambda = numerator / denominator;
+		lambda[particle_index] = -numerator/denominator;
 	}
 } 
 
 void ParticleContainer::intialize_CUDA()
 {
-	size_t mem_size = sizeof(Particle) * MAX_PARTICLE_COUNT;
-	gpuErrchk(cudaMalloc((void **)&container_CUDA, mem_size));
-	gpuErrchk(cudaMemcpy(container_CUDA, container, mem_size, cudaMemcpyHostToDevice));
-	mem_size = sizeof(int) * MAX_PARTICLE_COUNT * MAX_NEIGHBOURS;
+	//for solvers
+	size_t mem_size = sizeof(float) * MAX_PARTICLE_COUNT * 3;
+	gpuErrchk(cudaMalloc((void **)&particle_positions_CUDA, mem_size));
+	gpuErrchk(cudaMalloc((void **)&particle_speeds_CUDA, mem_size));
+	gpuErrchk(cudaMalloc((void **)&particle_predicted_pos_CUDA, mem_size));
+	
+	//one float per particle
+	mem_size = sizeof(float) * MAX_PARTICLE_COUNT;
+	gpuErrchk(cudaMalloc((void **)&particle_lambdas_CUDA, mem_size));
+	gpuErrchk(cudaMalloc((void **)&particle_life_CUDA, mem_size));
+	gpuErrchk(cudaMemset((void*)particle_life_CUDA,0, mem_size));
 
+	//for neighbours
 	mem_size = sizeof(int) * MAX_PARTICLE_COUNT * MAX_NEIGHBOURS;
-	neighbour_array = (int*)malloc(mem_size);
 	gpuErrchk(cudaMalloc((void **)&neighbours_CUDA, mem_size));
 
 	//for copying to renderbuffers
 	mem_size = sizeof(GLfloat) * MAX_PARTICLE_COUNT * 4;
 	gpuErrchk(cudaMalloc((void **)&positions_CUDA, mem_size));
-	gpuErrchk(cudaMemset((void **)&positions_CUDA,0, mem_size));
+	gpuErrchk(cudaMemset((void *)positions_CUDA,0, mem_size));
 
 	mem_size = sizeof(GLubyte) * MAX_PARTICLE_COUNT * 4;
 	gpuErrchk(cudaMalloc((void **)&colors_CUDA, mem_size));
+
+	//init data
+	updateParticles << < 1, 512 >> >(0.2, particle_positions_CUDA,
+		particle_predicted_pos_CUDA, particle_speeds_CUDA, particle_life_CUDA,
+		positions_CUDA, colors_CUDA, 0);
+	//Error handling
+	gpuErrchk(cudaDeviceSynchronize());
+	gpuErrchk(cudaGetLastError());
 } 
 void ParticleContainer::cleanup_CUDA()
 {
-	free(neighbour_array);
-	gpuErrchk(cudaFree((void **)&container_CUDA));
+	gpuErrchk(cudaFree((void **)&particle_positions_CUDA));
+	gpuErrchk(cudaFree((void **)&particle_lambdas_CUDA));
+	gpuErrchk(cudaFree((void **)&particle_speeds_CUDA));
+	gpuErrchk(cudaFree((void **)&particle_predicted_pos_CUDA));
 	gpuErrchk(cudaFree((void **)&neighbours_CUDA));
 	gpuErrchk(cudaFree((void **)&colors_CUDA));
-	gpuErrchk(cudaFree((void **)&positions_CUDA));
+	gpuErrchk( cudaFree((void **)&positions_CUDA));
 }
 void ParticleContainer::updateParticles_CUDA(double delta)
 {
 	int start_time = glutGet(GLUT_ELAPSED_TIME);
 	int time;
+
 	//update particles for next iteration
 	int threadsPerBlock = THREADS_PER_BLOCK;
 	int blocksPerGrid = MAX_PARTICLE_COUNT / THREADS_PER_BLOCK + 1;
-	updateParticles << <blocksPerGrid, threadsPerBlock >> >(delta, container_CUDA,
+	updateParticles << <blocksPerGrid, threadsPerBlock >> >(delta, particle_positions_CUDA, 
+		particle_predicted_pos_CUDA, particle_speeds_CUDA, particle_life_CUDA,
 		positions_CUDA, colors_CUDA, rand());
 
 	//Error handling
@@ -373,18 +372,19 @@ void ParticleContainer::solverIterations_CUDA(float delta)
 	int threadsPerBlock = THREADS_PER_BLOCK; //so we can have  multiple blocks on processors
 	int blocksPerGrid = MAX_PARTICLE_COUNT * MAX_NEIGHBOURS / THREADS_PER_BLOCK + 1;
 	 
-	for (int i = 0; i < iteration_count; i++)
+	for (int i = 0; i < 10; i++)
 	{
 		// Launch the CUDA Kernel for lambdas
-		solverIterationLambdas << <blocksPerGrid, threadsPerBlock >> >(container_CUDA, neighbours_CUDA, p0, h);
+		solverIterationLambdas << <blocksPerGrid, threadsPerBlock >> >(particle_predicted_pos_CUDA,
+			particle_life_CUDA, particle_speeds_CUDA, particle_lambdas_CUDA, neighbours_CUDA, 0.5, 5, 0.1);
 
 		//Error handling
 		gpuErrchk(cudaDeviceSynchronize());
 		gpuErrchk(cudaGetLastError());
 
 		// Launch the CUDA Kernel for positions
-		solverIterationPositions << <blocksPerGrid, threadsPerBlock >> >(container_CUDA, neighbours_CUDA, h, 
-			Wq, corr_k, n);
+		solverIterationPositions << <blocksPerGrid, threadsPerBlock >> >(particle_predicted_pos_CUDA,
+			particle_life_CUDA, particle_lambdas_CUDA, neighbours_CUDA, 5, 0.0121611953, 0.1, 0.5, 4);
 		//Error handling
 		gpuErrchk(cudaDeviceSynchronize());
 		gpuErrchk(cudaGetLastError());
