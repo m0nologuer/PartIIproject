@@ -3,11 +3,10 @@
 
 #define RECORD_SPEED(x) time = glutGet(GLUT_ELAPSED_TIME); printf(x, time-start_time); start_time = time;
 
-//#define USE_CUDA
+#define USE_CUDA
 #ifdef USE_CUDA
-#define USE_KDTREE
-#define MAX_NEIGHBOURS 4
-#define MAX_NEIGHBOURS_LOG 3
+#define MAX_NEIGHBOURS 8
+#define GRID_RES 16
 #define THREADS_PER_BLOCK 512
 #define MAX_THREADS 512
 #define EPSILON 0.00001

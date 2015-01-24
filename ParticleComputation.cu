@@ -22,19 +22,27 @@ void ParticleContainer::CUDAloop(double delta)
 	mem_size = sizeof(GLubyte) * MAX_PARTICLE_COUNT * 4;
 	gpuErrchk(cudaMemcpy(g_particle_color_data, colors_CUDA, mem_size, cudaMemcpyDeviceToHost));
 
+#ifdef USE_KDTREE
 	//start by building the k-D tree if we don't have one
 	if (!tree)
 	{
 		tree = KDTree::treeFromFloats(g_particle_position_data, MAX_PARTICLE_COUNT);
 		RECORD_SPEED("	Build K-D tree  %d ms \n");
-	}
+	}   
 	
 	//parrell batch processing of neighbours
 	tree->batchNeighbouringParticles(h, positions_CUDA, neighbours_CUDA);
 	RECORD_SPEED("	Find neighbouring particles  %d ms \n");
+	//refresh kdtree periodically
+	if (rand() % 5 == 0)
+	{
+		delete tree;
+		tree = NULL;
+	}
 
-	mem_size = sizeof(int) * MAX_PARTICLE_COUNT * MAX_NEIGHBOURS;
-	gpuErrchk(cudaMemcpy(neighbours_array, neighbours_CUDA, mem_size, cudaMemcpyDeviceToHost));
+#else
+	findNeighbours_CUDA(delta);
+#endif
 
 	//Perform collision detection, solving
 	solverIterations_CUDA(delta);
@@ -42,13 +50,6 @@ void ParticleContainer::CUDAloop(double delta)
 
 	mem_size = sizeof(float) * MAX_PARTICLE_COUNT;
 	gpuErrchk(cudaMemcpy(lambdas_array, particle_lambdas_CUDA, mem_size, cudaMemcpyDeviceToHost));
-
-	//refresh kdtree periodically
-	if (rand() % 5 == 0)
-	{
-		delete tree;
-		tree = NULL;
-	}
 
 }
 extern "C" __device__ float W_poly6_cuda(Particle::vec3 r, float h)
@@ -112,10 +113,167 @@ extern "C" __device__ Particle::vec3 dW_spiky_cuda(Particle::vec3 r, float h)
 		return zero;
 	}
 }
+extern "C" __global__ void buildGrid(float *predicted_pos, int *grid, float h,
+	float min_x, float min_y, float min_z)
+{
+	int index = blockDim.x * blockIdx.x + threadIdx.x; //thread id, from 0 to MAX_PARTICL E_COUNT
+
+	//fill up grid 
+	if (index < MAX_PARTICLE_COUNT)
+	{
+		float * pos = &predicted_pos[3 * index];
+		int i = (pos[0] - min_x) / h;
+		int j = (pos[1] - min_y) / h;
+		int k = (pos[2] - min_z) / h;
+
+		bool within_range = (i > 0 && i < h * GRID_RES) && (j > 0 && j < h * GRID_RES)
+			&& (k > 0 && k < h * GRID_RES);
+		if (within_range)
+			grid[index] = i * GRID_RES * GRID_RES + j * GRID_RES + k;
+		else
+			grid[index] = -1;
+	}
+}
+__device__ void swap_grid(int *array, int i1, int i2)
+{
+	int temp = array[i1];
+	array[i1] = array[i2];
+	array[i2] = temp;
+}
+extern "C" __global__ void sortGrid(int *grid)
+{
+	int index = blockDim.x * blockIdx.x + threadIdx.x; //thread id, from 0 to MAX_PARTICL E_COUNT
+	if (!(index < MAX_PARTICLE_COUNT))
+		return;
+	int grid_value = grid[index];
+
+	//mergesort based on the roundedup value of predicted pos, then by index
+	int start = index;
+	int block_size = 1;
+	while (start % (block_size * 2) == 0 && block_size < MAX_PARTICLE_COUNT)
+	{
+		int i = 0;
+		int j = 0;
+		int w = 0;
+		int* current_block = &grid[2 * start];
+
+		//merge sort this section
+		while (i < block_size && j < block_size && j + start < MAX_PARTICLE_COUNT)
+		{
+			if (current_block[i] < current_block[(block_size + j)])
+				swap_grid(current_block, w++, i++);
+			else
+				swap_grid(current_block, w++, block_size + j++);
+		}
+
+		while (i < block_size)
+			swap_grid(current_block, w++, i++);
+
+		while (j < block_size && j + block_size + start < MAX_PARTICLE_COUNT)
+			swap_grid(current_block, w++, block_size + j++);
+
+
+		block_size *= 2;
+		__syncthreads();
+	}
+
+}
+extern "C" __global__ void buildIndex(int *grid, int *grid_index)
+{
+	int index = blockDim.x * blockIdx.x + threadIdx.x; //thread id, from 0 to MAX_PARTICL E_COUNT
+	if (!(index < GRID_RES*GRID_RES*GRID_RES))
+		return;
+
+	//search for grid value, where each cell is a rounded up predicted pos value
+	int start_index = MAX_PARTICLE_COUNT / 2;
+	int end_index = MAX_PARTICLE_COUNT / 2;
+	for (int step = start_index / 2; step > 0; step /= 2)
+	{
+		//find index to start of block
+		if (grid[start_index] < index)
+			start_index += step;
+		else
+			start_index -= step;
+
+		//and end
+		if (grid[end_index] < index)
+			end_index -= step;
+		else
+			end_index += step;
+	}
+	if (grid[start_index] == index)
+		grid_index[2*index] = max(start_index - 1, 0);
+	else
+		grid_index[2*index] = -1;
+
+	if (grid[end_index] == index)
+		grid_index[2 * index + 1] = end_index + 1;
+	else
+		grid_index[2 * index + 1] = -1;
+}  
+extern "C" __global__ void findNeighboursGrid(float *predicted_pos, int *grid, int* grid_index, int scramble,
+	int* neighbour_indexes, float min_x, float min_y, float min_z, float h)
+{
+	int index = blockDim.x * blockIdx.x + threadIdx.x; //thread id, from 0 to MAX_PARTICL E_COUNT
+	if (!(index < MAX_PARTICLE_COUNT))
+		return;
+
+	//find cube on grid
+	float * pos = &predicted_pos[3 * index];
+	int i_i = (pos[0] - min_x) / h;
+	int i_j = (pos[1] - min_y) / h;
+	int i_k = (pos[2] - min_z) / h;
+
+	bool within_range = (i_i > 0 && i_i < h * GRID_RES) && (i_j > 0 && i_j < h * GRID_RES)
+		&& (i_k > 0 && i_k < h * GRID_RES);
+	if (!within_range)
+		return;
+
+	//find neighbours
+	int found_neighbours = 0;
+	float h_2 = h*h;
+	//loop through neighbouring squares
+	for (int i = 0; i < 3; i++)
+		for (int j = 0; j < 3; j++)
+			for (int k = 0; k < 3; k++)
+			{
+				int r_i = ((i*scramble + scramble) % 3 - 1 + i_i + 1) % GRID_RES;
+				int r_j = ((j*scramble + scramble) % 3 - 1 + i_j + 1) % GRID_RES;
+				int r_k = ((k*scramble + scramble) % 3 - 1 + i_k + 1) % GRID_RES;
+
+				int grid_offsetted_val = r_i * GRID_RES * GRID_RES + r_j * GRID_RES + r_k;
+				int start = grid_index[2*grid_offsetted_val];
+				if (start < 0)
+					continue;
+				int end = grid_index[2 * grid_offsetted_val + 1];
+				//check all the neighbouring particles
+				for (int counter = start; counter < end; counter++)
+					if (found_neighbours < MAX_NEIGHBOURS)
+					{
+						int offset = (counter*scramble + index) % (end - start) + start;
+						float distance = 0;
+						for (int i = 0; i < 3; i++)
+							distance += (pos[i] - predicted_pos[3 * offset + i]) * (pos[i] - predicted_pos[3 * offset + i]);
+
+						//store the index to the location in the rpedicted pos array
+						if (distance < h_2)
+						{ 
+							neighbour_indexes[index*MAX_NEIGHBOURS + found_neighbours] = offset;
+							found_neighbours++;
+						}
+					}
+			}
+	//fill up the rest of the neighbours
+	while (found_neighbours < MAX_NEIGHBOURS)
+	{
+		neighbour_indexes[index*MAX_NEIGHBOURS + found_neighbours] = -1;
+		found_neighbours++;
+	}
+}
 extern "C" __device__  void applyForce(float* speed , float delta)
 {
-	speed[0] += 0;
-	speed[1] += -9.81* delta;
+	speed[0] *= 0.9;
+	speed[1] += -9.81 * delta;
 	speed[2] += 0;
 };
 
@@ -140,6 +298,8 @@ extern "C" __global__ void updateParticles(float delta, float *pos, float* predi
 			GL_colors[4 * i + 1] = 84;
 			GL_colors[4 * i + 2] = 84;
 			GL_colors[4 * i + 3] = 255;
+
+			GL_colors[4 * i] = (char)((5.0 - life[i]) * 255);
 
 			// update position and speed, apply physics force
 			for (int j = 0; j < 3; j++)
@@ -177,7 +337,7 @@ extern "C" __global__ void updateParticles(float delta, float *pos, float* predi
 				for (int j = 0; j < 3; j++)
 					predicted_pos[3 * i + j] = pos[3 * i + j] + speed[3 * i + j] * delta;
 
-				life[i] = 5.0f; //lasts 1 second
+				life[i] = 5.0f; //lasts 5 second
 			}
 		}
 	}
@@ -243,6 +403,7 @@ extern "C" __global__ void solverIterationPositions(float* predicted_pos, float*
 
 	}
 }
+
 extern "C" __global__ void solverIterationLambdas(float *predicted_pos, const float* life, 
 	 float* speed, float* lambda, const int *neighbour_indexes, float p0, float h, float e0)
 {
@@ -279,7 +440,7 @@ extern "C" __global__ void solverIterationLambdas(float *predicted_pos, const fl
 
 		lambda_numerators[storage_index] = W_poly6_cuda(distance, h);
 
-		float* pj_speed = speed + particle_neighbour_index * 3; //indexing by rows and columns
+		float* pj_speed = speed +  particle_neighbour_index * 3; //indexing by rows and columns
 
 		Particle::vec3 d_distance = dW_poly6_cuda(distance, h);
 		lambda_denominators[storage_index] = -(d_distance.x * pj_speed[0] + d_distance.y * pj_speed[1]
@@ -320,6 +481,10 @@ void ParticleContainer::intialize_CUDA()
 	//for neighbours
 	mem_size = sizeof(int) * MAX_PARTICLE_COUNT * MAX_NEIGHBOURS;
 	gpuErrchk(cudaMalloc((void **)&neighbours_CUDA, mem_size));
+	mem_size = sizeof(int) * MAX_PARTICLE_COUNT;
+	gpuErrchk(cudaMalloc((void **)&grid_CUDA, mem_size));
+	mem_size = sizeof(int) * GRID_RES * GRID_RES * GRID_RES * 2;
+	gpuErrchk(cudaMalloc((void **)&grid_index_CUDA, mem_size));
 
 	//for copying to renderbuffers
 	mem_size = sizeof(GLfloat) * MAX_PARTICLE_COUNT * 4;
@@ -345,7 +510,9 @@ void ParticleContainer::cleanup_CUDA()
 	gpuErrchk(cudaFree((void **)&particle_predicted_pos_CUDA));
 	gpuErrchk(cudaFree((void **)&neighbours_CUDA));
 	gpuErrchk(cudaFree((void **)&colors_CUDA));
-	gpuErrchk( cudaFree((void **)&positions_CUDA));
+	gpuErrchk(cudaFree((void **)&positions_CUDA));
+	gpuErrchk(cudaFree((void **)&grid_CUDA));
+	gpuErrchk(cudaFree((void **)&grid_index_CUDA));
 }
 void ParticleContainer::updateParticles_CUDA(double delta)
 {
@@ -372,7 +539,7 @@ void ParticleContainer::solverIterations_CUDA(float delta)
 	int threadsPerBlock = THREADS_PER_BLOCK; //so we can have  multiple blocks on processors
 	int blocksPerGrid = MAX_PARTICLE_COUNT * MAX_NEIGHBOURS / THREADS_PER_BLOCK + 1;
 	 
-	for (int i = 0; i < 10; i++)
+	for (int i = 0; i < 5; i++)
 	{
 		// Launch the CUDA Kernel for lambdas
 		solverIterationLambdas << <blocksPerGrid, threadsPerBlock >> >(particle_predicted_pos_CUDA,
@@ -389,5 +556,52 @@ void ParticleContainer::solverIterations_CUDA(float delta)
 		gpuErrchk(cudaDeviceSynchronize());
 		gpuErrchk(cudaGetLastError());
 	}
+}
+void ParticleContainer::findNeighbours_CUDA(float delta)
+{
+	int start_time = glutGet(GLUT_ELAPSED_TIME);
+	int time;
+
+	//find neigbours for next iteration
+	int threadsPerBlock = THREADS_PER_BLOCK;
+	int blocksPerGrid = MAX_PARTICLE_COUNT / THREADS_PER_BLOCK + 1;
+	buildGrid << <blocksPerGrid, threadsPerBlock >> >(particle_predicted_pos_CUDA, grid_CUDA,
+		5, -25, 75, -25);
+	gpuErrchk(cudaDeviceSynchronize());
+	gpuErrchk(cudaGetLastError());
+	RECORD_SPEED("		Build grid  %d ms \n");
+
+	//sort the grid
+	sortGrid << <blocksPerGrid, threadsPerBlock >> >( grid_CUDA);
+	gpuErrchk(cudaDeviceSynchronize());
+	gpuErrchk(cudaGetLastError());
+	RECORD_SPEED("		Sort grid  %d ms \n");
+
+	//build index
+	blocksPerGrid = GRID_RES * GRID_RES * GRID_RES / THREADS_PER_BLOCK + 1;
+	buildIndex << <blocksPerGrid, threadsPerBlock >> >(grid_CUDA, grid_index_CUDA);
+	gpuErrchk(cudaDeviceSynchronize());
+	gpuErrchk(cudaGetLastError());
+	RECORD_SPEED("		Build index  %d ms \n");
+
+	//find neighbours
+	blocksPerGrid = MAX_PARTICLE_COUNT / THREADS_PER_BLOCK + 1;
+	findNeighboursGrid << <blocksPerGrid, threadsPerBlock >> >(particle_predicted_pos_CUDA, grid_CUDA, 
+		grid_index_CUDA, rand(), neighbours_CUDA, -25, 75, -25, 5);
+	gpuErrchk(cudaDeviceSynchronize());
+	gpuErrchk(cudaGetLastError());
+	RECORD_SPEED("		Use grid to find particles  %d ms \n");
+
+
+	size_t mem_size = sizeof(int) * MAX_PARTICLE_COUNT;
+	gpuErrchk(cudaMemcpy(grid_array, grid_CUDA, mem_size, cudaMemcpyDeviceToHost));
+	mem_size = sizeof(int) * GRID_RES * GRID_RES * GRID_RES * 2;
+	gpuErrchk(cudaMemcpy(grid_index_array, grid_index_CUDA, mem_size, cudaMemcpyDeviceToHost));
+	mem_size = sizeof(int) * MAX_NEIGHBOURS * MAX_PARTICLE_COUNT;
+	gpuErrchk(cudaMemcpy(neighbours_array, neighbours_CUDA, mem_size, cudaMemcpyDeviceToHost));
+
+ 	RECORD_SPEED("	Find neighbouring particles  %d ms \n");
+	time++;
+
 }
 #endif

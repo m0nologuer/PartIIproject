@@ -34,15 +34,10 @@ void ParticleContainer::applyPhysics(double delta)
 #else
 			neighbours[i] = findNeighbouringParticles(p);
 #endif
-			double l1 = lambda(i);
-			while (neighbours[i].size() > 4)
-			{
-				neighbours[i].pop_back();
-			};
-			double l2 = lambda(i);
-			printf("%f, %f - %f \n", l1, l2, l1 / l2);
 		}
 	}
+	RECORD_SPEED("	Find neighbours  %d ms \n");
+
 
 	for (int i = 0; i < iteration_count; i++)
 	{

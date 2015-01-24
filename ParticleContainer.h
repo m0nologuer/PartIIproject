@@ -48,6 +48,7 @@ private:
 	//CUDA accelerated physics
 	void CUDAloop(double delta);
 	void updateParticles_CUDA(double delta);
+	void findNeighbours_CUDA(float delta); 
 	void intialize_CUDA();
 	void solverIterations_CUDA(float delta);
 	void cleanup_CUDA();
@@ -65,11 +66,15 @@ private:
 
 	//determine neihgbours
 	int* neighbours_CUDA;
-	int neighbours_array[max_particle_count];
+	int* grid_CUDA;
+	int* grid_index_CUDA;
+	int grid_array[max_particle_count];
+	int grid_index_array[GRID_RES * GRID_RES * GRID_RES * 2];
+	int neighbours_array[max_particle_count * MAX_NEIGHBOURS];
 	float lambdas_array[max_particle_count];
 #endif
 
-	static const int particles_per_iteration = 600;
+	static const int particles_per_iteration = 1000;
 	static const int iteration_count = 10;
 	static const int life = 5.0f;
 

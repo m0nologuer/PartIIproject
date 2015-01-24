@@ -131,7 +131,7 @@ void ParticleContainer::UpdateParticles(double delta)
 	int time;
 
 #ifdef USE_CUDA
-	CUDAloop(delta*0.01);
+	CUDAloop(delta);
 	render_counter = max_particle_count;
 
 #else
