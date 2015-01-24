@@ -140,6 +140,46 @@ __device__ void swap_grid(int *array, int i1, int i2)
 	array[i1] = array[i2];
 	array[i2] = temp;
 }
+__device__ void swap_grid_block(int *array, int index, int block_size, bool direction)
+{
+	//block and block index
+	int block = index / block_size;
+	int block_i = index % block_size;
+	if (block_i * 2 > block_size)
+	{
+		block += (MAX_PARTICLE_COUNT / 2) / block_size;
+		block_i = (block_size - block_i);
+	}
+	int i1 = block*block_size + block_i;
+	int i2 = 0;
+	
+	if (direction)
+		i2 = block*block_size + (block_size - block_i);
+	else
+		i2 = block*block_size + (block_i + block_size / 2);
+
+	swap_grid(array, i1, i2);
+
+}
+extern "C" __global__ void bitonicSortGrid(int *grid)
+{
+	int index = blockDim.x * blockIdx.x + threadIdx.x; //thread id, from 0 to MAX_PARTICLE_COUNT/2
+	if (!(index < MAX_PARTICLE_COUNT/2))
+		return;
+
+	for (int i = 2; i <= MAX_PARTICLE_COUNT; i *= 2)
+	{
+		swap_grid_block(grid, index, i, true);
+		__syncthreads();
+
+		for (int j = i/2; j > 1; j /= 2)
+		{
+			swap_grid_block(grid, index, j, false);
+			__syncthreads();
+		}
+	}
+
+}
 extern "C" __global__ void sortGrid(int *grid)
 {
 	int index = blockDim.x * blockIdx.x + threadIdx.x; //thread id, from 0 to MAX_PARTICL E_COUNT
@@ -572,7 +612,7 @@ void ParticleContainer::findNeighbours_CUDA(float delta)
 	RECORD_SPEED("		Build grid  %d ms \n");
 
 	//sort the grid
-	sortGrid << <blocksPerGrid, threadsPerBlock >> >( grid_CUDA);
+	bitonicSortGrid << <blocksPerGrid, threadsPerBlock >> >(grid_CUDA);
 	gpuErrchk(cudaDeviceSynchronize());
 	gpuErrchk(cudaGetLastError());
 	RECORD_SPEED("		Sort grid  %d ms \n");
