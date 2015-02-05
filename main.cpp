@@ -12,10 +12,12 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <fstream>
 #include <gl/glew.h>
 #include <GL/glut.h>
 #include <GL/glext.h>
-
+#include <opencv\cv.h>
+#include <opencv\highgui.h>
 #include "ParticleContainer.h"
 #include "GlobalSettings.h"
 
@@ -24,6 +26,9 @@ ParticleContainer p_container;
 GlobalSettings settings;
 
 GLuint scene_list;
+
+CvVideoWriter *writer = NULL;
+int w = 900; int h = 600;
 
 // ----------------------------------------------------------------------------
 void do_motion(void)
@@ -34,10 +39,12 @@ void do_motion(void)
 
 	int time = glutGet(GLUT_ELAPSED_TIME);
 	c_loader.angle += (time - prev_time)*0.01;
+	printf("%d cycle time\n", time - prev_time);
 	p_container.UpdateParticles(0.02); //fixed time interval
 	prev_time = time;
 
 	frames += 1;
+
 	if ((time - prev_fps_time) > 1000) // update every seconds
 	{
 		int current_fps = frames * 1000 / (time - prev_fps_time);
@@ -85,7 +92,17 @@ void display(void)
 	//glCallList(scene_list);
 
 	p_container.Draw();
-	
+
+	//for video
+	if (writer)
+	{
+		unsigned char *raw_image = (unsigned char*)calloc(w * h * 3, sizeof(char));
+		glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, raw_image);
+		IplImage* img = cvCreateImage(cvSize(w, h), IPL_DEPTH_8U, 3);
+		img->imageData = (char *)raw_image;
+		cvWriteFrame(writer, img);      // add the frame to the file
+		cvReleaseImage(&img);
+	}
 	glutSwapBuffers();
 
 	do_motion();
@@ -102,14 +119,14 @@ void reshape(int width, int height)
 		1.0, 1000.0);  /* Znear and Zfar */
 	glViewport(0, 0, width, height);
 }
-
+ 
 // ----------------------------------------------------------------------------
 int main(int argc, char **argv)
 {
 	struct aiLogStream stream;
 
-	glutInitWindowSize(900,600);
-	glutInitWindowPosition(100,100);
+ 	glutInitWindowSize(w,h);
+	glutInitWindowPosition(100,100);  
 	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
 	glutInit(&argc, argv);
 
@@ -124,6 +141,13 @@ int main(int argc, char **argv)
 	else
 		settings_loaded = settings.LoadFromJson("../../assets/settings.json");
 	if (!settings_loaded) { return 1; };
+
+	if (settings.record_video())
+	{
+		// creates video: file to write -- codec that's gonna be used -- frame per second -- size of video frames -- grayscale or not
+		CvSize size = cvSize(w, h);
+		writer = cvCreateVideoWriter(settings.video_file_name(), CV_FOURCC('I', 'Y', 'U', 'V'), 0, size, true);
+	}
 
 	// the model name can be specified in the settings.
 	char* model_name = settings.getAssetLocation("model_name");
@@ -156,6 +180,9 @@ int main(int argc, char **argv)
 
 	glutGet(GLUT_ELAPSED_TIME);
 	glutMainLoop();
+
+
+	cvReleaseVideoWriter(&writer);
 
 	return 0;
 }

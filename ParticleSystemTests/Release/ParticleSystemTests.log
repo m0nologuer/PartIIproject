@@ -1,0 +1,39 @@
+﻿Build started 31/01/2015 15:30:20.
+     1>Project "C:\Users\saku\Desktop\PartIIProject\PartIIProject\ParticleSystemTests\ParticleSystemTests.vcxproj" on node 2 (Build target(s)).
+     1>ClCompile:
+         C:\Program Files\Microsoft Visual Studio 12.0\VC\bin\CL.exe /c /I"C:\Program Files\Microsoft Visual Studio 12.0\VC\UnitTest\include" /Zi /nologo /W3 /WX- /O2 /Oi /Oy- /GL /D WIN32 /D NDEBUG /D _WINDLL /D _UNICODE /D UNICODE /Gm- /EHsc /MD /GS /Gy /fp:precise /Zc:wchar_t /Zc:forScope /Yc"stdafx.h" /Fp"Release\ParticleSystemTests.pch" /Fo"Release\\" /Fd"Release\vc120.pdb" /Gd /TP /analyze- /FC /errorReport:prompt stdafx.cpp
+         stdafx.cpp
+         C:\Program Files\Microsoft Visual Studio 12.0\VC\bin\CL.exe /c /I"C:\Program Files\Microsoft Visual Studio 12.0\VC\UnitTest\include" /Zi /nologo /W3 /WX- /O2 /Oi /Oy- /GL /D WIN32 /D NDEBUG /D _WINDLL /D _UNICODE /D UNICODE /Gm- /EHsc /MD /GS /Gy /fp:precise /Zc:wchar_t /Zc:forScope /Yu"stdafx.h" /Fp"Release\ParticleSystemTests.pch" /Fo"Release\\" /Fd"Release\vc120.pdb" /Gd /TP /analyze- /FC /errorReport:prompt ..\util\shader.cpp ..\util\texture.cpp benchmarks.cpp MeshAdjacancyGraph.cpp ParticleSystemAccuracy.cpp TestUtil.cpp unittest1.cpp
+         shader.cpp
+     1>c:\users\saku\desktop\partiiproject\partiiproject\util\shader.cpp(3): warning C4627: '#include <vector>': skipped when looking for precompiled header use
+                 Add directive to 'stdafx.h' or rebuild precompiled header
+     1>c:\users\saku\desktop\partiiproject\partiiproject\util\shader.cpp(4): warning C4627: '#include <iostream>': skipped when looking for precompiled header use
+                 Add directive to 'stdafx.h' or rebuild precompiled header
+     1>c:\users\saku\desktop\partiiproject\partiiproject\util\shader.cpp(5): warning C4627: '#include <fstream>': skipped when looking for precompiled header use
+                 Add directive to 'stdafx.h' or rebuild precompiled header
+     1>c:\users\saku\desktop\partiiproject\partiiproject\util\shader.cpp(6): warning C4627: '#include <algorithm>': skipped when looking for precompiled header use
+                 Add directive to 'stdafx.h' or rebuild precompiled header
+     1>c:\users\saku\desktop\partiiproject\partiiproject\util\shader.cpp(12): warning C4627: '#include <GL/glew.h>': skipped when looking for precompiled header use
+                 Add directive to 'stdafx.h' or rebuild precompiled header
+     1>c:\users\saku\desktop\partiiproject\partiiproject\util\shader.cpp(14): warning C4627: '#include "shader.hpp"': skipped when looking for precompiled header use
+                 Add directive to 'stdafx.h' or rebuild precompiled header
+     1>c:\users\saku\desktop\partiiproject\partiiproject\util\shader.cpp(110): fatal error C1010: unexpected end of file while looking for precompiled header. Did you forget to add '#include "stdafx.h"' to your source?
+         texture.cpp
+     1>c:\users\saku\desktop\partiiproject\partiiproject\util\texture.cpp(5): warning C4627: '#include <GL/glew.h>': skipped when looking for precompiled header use
+                 Add directive to 'stdafx.h' or rebuild precompiled header
+     1>c:\users\saku\desktop\partiiproject\partiiproject\util\texture.cpp(211): fatal error C1010: unexpected end of file while looking for precompiled header. Did you forget to add '#include "stdafx.h"' to your source?
+         benchmarks.cpp
+     1>c:\users\saku\desktop\partiiproject\partiiproject\particlesystemtests\benchmarks.cpp(2): fatal error C1083: Cannot open include file: 'gl/glew.h': No such file or directory
+         MeshAdjacancyGraph.cpp
+     1>c:\users\saku\desktop\partiiproject\partiiproject\particlesystemtests\meshadjacancygraph.h(2): fatal error C1083: Cannot open include file: 'assimp/scene.h': No such file or directory
+         ParticleSystemAccuracy.cpp
+     1>c:\users\saku\desktop\partiiproject\partiiproject\particlesystemtests\particlesystemaccuracy.cpp(2): fatal error C1083: Cannot open include file: 'gl/glew.h': No such file or directory
+         TestUtil.cpp
+     1>c:\users\saku\desktop\partiiproject\partiiproject\particlesystemtests\testutil.h(3): fatal error C1083: Cannot open include file: 'IL/il.h': No such file or directory
+         unittest1.cpp
+     1>c:\users\saku\desktop\partiiproject\partiiproject\particlesystemtests\unittest1.cpp(2): fatal error C1083: Cannot open include file: 'gl/glew.h': No such file or directory
+     1>Done Building Project "C:\Users\saku\Desktop\PartIIProject\PartIIProject\ParticleSystemTests\ParticleSystemTests.vcxproj" (Build target(s)) -- FAILED.
+
+Build FAILED.
+
+Time Elapsed 00:00:02.38

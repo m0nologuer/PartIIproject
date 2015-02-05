@@ -1,0 +1,16 @@
+﻿Build started 31/01/2015 15:30:28.
+     1>Project "C:\Users\saku\Desktop\PartIIProject\PartIIProject\SimpleOpenGL.vcxproj" on node 2 (Build target(s)).
+     1>CudaBuild:
+         Compiling CUDA source file KDTree.cu...
+         cmd.exe /C "C:\Users\saku\AppData\Local\Temp\tmpe5b2e89960eb48a493fa2e0e1cf7cc4f.cmd"
+         "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v6.5\bin\nvcc.exe" -gencode=arch=compute_20,code=\"sm_20,compute_20\" --use-local-env --cl-version 2013 -ccbin "C:\Program Files\Microsoft Visual Studio 12.0\VC\bin"  -I..\glut -I..\..\include -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v6.5\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v6.5\include"     --keep-dir Release -maxrregcount=0  --machine 32 --compile -cudart static     -DWIN32 -DNDEBUG -D_CONSOLE -D_UNICODE -DUNICODE -Xcompiler "/EHsc /W3 /nologo /O2 /Zi  /MD  " -o Release\KDTree.cu.obj "C:\Users\saku\Desktop\PartIIProject\PartIIProject\KDTree.cu"
+         
+         C:\Users\saku\Desktop\PartIIProject\PartIIProject>"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v6.5\bin\nvcc.exe" -gencode=arch=compute_20,code=\"sm_20,compute_20\" --use-local-env --cl-version 2013 -ccbin "C:\Program Files\Microsoft Visual Studio 12.0\VC\bin"  -I..\glut -I..\..\include -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v6.5\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v6.5\include"     --keep-dir Release -maxrregcount=0  --machine 32 --compile -cudart static     -DWIN32 -DNDEBUG -D_CONSOLE -D_UNICODE -DUNICODE -Xcompiler "/EHsc /W3 /nologo /O2 /Zi  /MD  " -o Release\KDTree.cu.obj "C:\Users\saku\Desktop\PartIIProject\PartIIProject\KDTree.cu" 
+     1>c:\users\saku\desktop\partiiproject\partiiproject\KDTree.h(12): fatal error C1083: Cannot open include file: 'GL/glext.h': No such file or directory
+         KDTree.cu
+     1>C:\Program Files\MSBuild\Microsoft.Cpp\v4.0\V120\BuildCustomizations\CUDA 6.5.targets(593,9): error MSB3721: The command ""C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v6.5\bin\nvcc.exe" -gencode=arch=compute_20,code=\"sm_20,compute_20\" --use-local-env --cl-version 2013 -ccbin "C:\Program Files\Microsoft Visual Studio 12.0\VC\bin"  -I..\glut -I..\..\include -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v6.5\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v6.5\include"     --keep-dir Release -maxrregcount=0  --machine 32 --compile -cudart static     -DWIN32 -DNDEBUG -D_CONSOLE -D_UNICODE -DUNICODE -Xcompiler "/EHsc /W3 /nologo /O2 /Zi  /MD  " -o Release\KDTree.cu.obj "C:\Users\saku\Desktop\PartIIProject\PartIIProject\KDTree.cu"" exited with code 2.
+     1>Done Building Project "C:\Users\saku\Desktop\PartIIProject\PartIIProject\SimpleOpenGL.vcxproj" (Build target(s)) -- FAILED.
+
+Build FAILED.
+
+Time Elapsed 00:00:01.50

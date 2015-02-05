@@ -14,12 +14,24 @@ bool GlobalSettings::LoadFromJson(char* settings)
 	}
 	return true;
 }
+bool GlobalSettings::record_video()
+{
+	return root["output"]["record"].asBool();
+}
+char* GlobalSettings::video_file_name(){
+	char* s = new char[4096];
+	char* string =(char*)root["output"]["jpeg_folder"].asCString();
+	memcpy(s, string, 2048);
+
+	return s;
+
+}
 char* GlobalSettings::getAssetLocation(char* name)
 {
-	char* s = new char[2048];
+	char* s = new char[256];
 	char* string = (char*)root["assets"][name].asCString();
 
-	memcpy(s, string, 2048);
+	memcpy(s, string, 256);
 
 	return s;
 }

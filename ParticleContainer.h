@@ -7,7 +7,7 @@
 
 using namespace std;
 
-#include <GL/glut.h>log_speed
+#include <GL/glut.h>
 #include <GL/glext.h>
 #include "KDTree.h"
 #include "PerformanceSettings.h"
@@ -17,12 +17,19 @@ using namespace std;
 #define h_6 (h_squared*h_squared*h_squared)
 #define h_9 (h_squared*h_squared*h_squared*h_squared*h)
 
+struct Config{
+	int particle_count;
+	int neighbour_count;
+	bool use_CUDA;
+	bool use_KDTree;
+};
 
 class ParticleContainer
 {
 public:
 	//constants
 	static const int n = 4;
+	FILE* csv;
 
 	//pointers to GL buffers
 	GLuint particles_color_buffer;
@@ -33,7 +40,7 @@ public:
 	~ParticleContainer();
 
 	void Init(char* texture, char* vertexShader, char* pixelShader);
-	void SetObstacle(ColladaLoader* mesh);
+	void Set(ColladaLoader* mesh, Config* settings);
 	void UpdateParticles(double delta);
 	void Draw();
 
@@ -44,11 +51,11 @@ public:
 	std::vector<Particle> getAll();
 
 private:
-#ifdef USE_CUDA
 	//CUDA accelerated physics
 	void CUDAloop(double delta);
 	void updateParticles_CUDA(double delta);
 	void findNeighbours_CUDA(float delta); 
+	void findNeighboursAtomic_CUDA(float delta);
 	void intialize_CUDA();
 	void solverIterations_CUDA(float delta);
 	void cleanup_CUDA();
@@ -65,14 +72,16 @@ private:
 	float* particle_predicted_pos_CUDA;
 
 	//determine neihgbours
+	int* counter_CUDA;
 	int* neighbours_CUDA;
 	int* grid_CUDA;
 	int* grid_index_CUDA;
-	int grid_array[max_particle_count];
+
+	//for testing
+	int grid_array[max_particle_count *8];
 	int grid_index_array[GRID_RES * GRID_RES * GRID_RES * 2];
 	int neighbours_array[max_particle_count * MAX_NEIGHBOURS];
 	float lambdas_array[max_particle_count];
-#endif
 
 	static const int particles_per_iteration = 1000;
 	static const int iteration_count = 10;
@@ -90,6 +99,7 @@ private:
 	Particle container[max_particle_count];
 	KDTree* tree;
 	ColladaLoader* mesh;
+	Config settings;
 
 	//for rendering
 	Particle::vec3 camera_pos;
@@ -101,6 +111,7 @@ private:
 
 	//GPU data
 	GLfloat g_particle_position_data[4 * max_particle_count];
+	GLfloat g_particle_velocity_data[4 * max_particle_count];
 	GLubyte g_particle_color_data[4 * max_particle_count];
 
 	//shader and texture variables

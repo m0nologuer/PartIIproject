@@ -57,8 +57,8 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\glext\include;..\glew\include;..\glut;..\assimp\include;..\jsoncpp-master\include;..\DevIL\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\glext\include;..\glew\include;..\glut;..\assimp\include;..\jsoncpp-master\include;..\DevIL\include;..\opencv\build\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;WITH_FFMPEG=ON;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -67,9 +67,9 @@
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>glut32.lib;assimpd.lib;glext.lib;glew32.lib;jsoncpp.lib;DevIL.lib;ILU.lib;ILUT.lib;cuda.lib;cudart_static.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>glut32.lib;assimpd.lib;glext.lib;glew32.lib;jsoncpp.lib;DevIL.lib;ILU.lib;ILUT.lib;cuda.lib;cudart_static.lib;opencv_objdetect2410d.lib;opencv_legacy2410d.lib;opencv_highgui2410d.lib;opencv_core2410d.lib;opencv_imgproc2410d.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(ProjectName).exe</OutputFile>
-      <AdditionalLibraryDirectories>..\glut;..\glext\lib;..\assimp\lib32;..\assimp\bin32;..\assimp\lib\Debug;..\glew\lib;..\Debug;..\jsoncpp-master\lib\Debug;..\DevIL\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\glut;..\glext\lib;..\assimp\lib32;..\assimp\bin32;..\assimp\lib\Debug;..\glew\lib;..\Debug;..\jsoncpp-master\lib\Debug;..\DevIL\lib;..\opencv\build\x86\vc12\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>

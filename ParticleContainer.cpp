@@ -33,15 +33,18 @@ ParticleContainer::ParticleContainer()
 	colors[3][0] = 217; colors[2][1] = 91; colors[2][2] = 67;
 	colors[3][0] = 236; colors[2][1] = 208; colors[2][2] = 120;
 
-#ifdef USE_CUDA
-	intialize_CUDA();
-#endif
+	settings.use_CUDA = true;
+ 
+	if (settings.use_CUDA)
+		intialize_CUDA();
+
+	csv = fopen("test.csv", "w");
 }
 ParticleContainer::~ParticleContainer()
 {
-#ifdef USE_CUDA
-	cleanup_CUDA();
-#endif
+	fclose(csv);
+	if (settings.use_CUDA)
+		cleanup_CUDA();
 }
 int ParticleContainer::getParticleCount(){
 	return render_counter;
@@ -49,9 +52,11 @@ int ParticleContainer::getParticleCount(){
 double ParticleContainer::getAverageSpeed(){
 	return average_speed;
 }
-void ParticleContainer::SetObstacle(ColladaLoader* m)
+void ParticleContainer::Set(ColladaLoader* m, Config* glob)
 {
 	mesh = m;
+
+	settings.use_CUDA = true;
 }
 std::string ParticleContainer::livePositionsList()
 {
@@ -98,6 +103,7 @@ void ParticleContainer::addNewParticles(double delta)
 
 	for (int i = 0; i < particles_per_iteration*delta; i++)
 	{ 
+
 		int index = getUnusedParticle();
 		Particle& p = container[index]; // shortcut
 
@@ -130,44 +136,44 @@ void ParticleContainer::UpdateParticles(double delta)
 	int start_time = glutGet(GLUT_ELAPSED_TIME);
 	int time;
 
-#ifdef USE_CUDA
-	CUDAloop(delta);
-	render_counter = max_particle_count;
+	if (settings.use_CUDA)
+	{
+		CUDAloop(delta);
+		render_counter = max_particle_count;
+	}
+	else{
+		addNewParticles(delta);
+		RECORD_SPEED("Add new particles %d ms \n");
 
-#else
-	addNewParticles(delta);
-	RECORD_SPEED("Add new particles %d ms \n");
+		applyPhysics(delta);
+		RECORD_SPEED("Apply physics  %d ms \n");
 
-	applyPhysics(delta);
-	RECORD_SPEED("Apply physics  %d ms \n");
+		render_counter = 0;
 
-	render_counter = 0;
+		for (int i = 0; i < max_particle_count; i++){
 
-	for (int i = 0; i< max_particle_count; i++){
+			Particle& p = container[i]; // shortcut
+			if (p.life > 0.0f){
 
-		Particle& p = container[i]; // shortcut
-		if (p.life > 0.0f){
+				// Fill the GPU buffer
+				g_particle_position_data[4 * render_counter + 0] = p.pos.x;
+				g_particle_position_data[4 * render_counter + 1] = p.pos.y;
+				g_particle_position_data[4 * render_counter + 2] = p.pos.z;
 
-			// Fill the GPU buffer
-			g_particle_position_data[4 * render_counter + 0] = p.pos.x;
-			g_particle_position_data[4 * render_counter + 1] = p.pos.y;
-			g_particle_position_data[4 * render_counter + 2] = p.pos.z;
+				g_particle_position_data[4 * render_counter + 3] = p.size;
 
-			g_particle_position_data[4 * render_counter + 3] = p.size;
+				g_particle_color_data[4 * render_counter + 0] = p.r;
+				g_particle_color_data[4 * render_counter + 1] = p.g;
+				g_particle_color_data[4 * render_counter + 2] = p.b;
+				g_particle_color_data[4 * render_counter + 3] = p.a;
 
-			g_particle_color_data[4 * render_counter + 0] = p.r;
-			g_particle_color_data[4 * render_counter + 1] = p.g;
-			g_particle_color_data[4 * render_counter + 2] = p.b;
-			g_particle_color_data[4 * render_counter + 3] = p.a;
+				render_counter++;
+				p.life -= delta;
 
-			render_counter++;
-			p.life -= delta;
+			}
 
 		}
-
+		RECORD_SPEED("Copy to buffer  %d ms \n");
+		printf("Finished with %d active particles \n", render_counter);
 	}
-	RECORD_SPEED("Copy to buffer  %d ms \n");
-	printf("Finished with %d active particles \n", render_counter);
-#endif
-
 }

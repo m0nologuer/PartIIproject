@@ -17,6 +17,10 @@ void ParticleContainer::applyPhysics(double delta)
 	RECORD_SPEED("	Build K-D tree  %d ms \n");
 #endif 
 
+	int total_neighbours = 0;
+	int total_particles = 0; 
+	int max_neighbouts = 0;
+
 	//update data structure
 	for (int i = 0; i < max_particle_count; i++){
 		Particle& p = container[i]; // shortcut
@@ -34,10 +38,17 @@ void ParticleContainer::applyPhysics(double delta)
 #else
 			neighbours[i] = findNeighbouringParticles(p);
 #endif
+			total_neighbours += neighbours[i].size();
+			total_particles++;
+			if (neighbours[i].size()>max_neighbouts)
+				max_neighbouts = neighbours[i].size();
 		}
 	}
-	RECORD_SPEED("	Find neighbours  %d ms \n");
+	float avaerage_n = total_neighbours / (float)total_particles;
+	
+	printf("%d p, %f average n, %d max", total_particles, avaerage_n, max_neighbouts);
 
+	RECORD_SPEED("	Find neighbours  %d ms \n");
 
 	for (int i = 0; i < iteration_count; i++)
 	{

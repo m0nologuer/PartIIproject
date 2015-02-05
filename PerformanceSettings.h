@@ -1,18 +1,17 @@
 #ifndef PERFORMANCE_SETTINGS
 #define PERFORMANCE_SETTINGS
-
+#include <cstdio>
+#define CSV_NEWL() fprintf(csv, "\n");
 #define RECORD_SPEED(x) time = glutGet(GLUT_ELAPSED_TIME); printf(x, time-start_time); start_time = time;
 
-#define USE_CUDA
-#ifdef USE_CUDA
-#define MAX_NEIGHBOURS 8
-#define GRID_RES 16
+//#define ATOMIC_METHOD
+#define MAX_NEIGHBOURS 16
+#define GRID_RES 16 
 #define THREADS_PER_BLOCK 512
 #define MAX_THREADS 512
 #define EPSILON 0.00001
-#endif
 
-#define MAX_PARTICLE_COUNT 4096*2
+#define MAX_PARTICLE_COUNT 6000
 #define max_particle_count MAX_PARTICLE_COUNT
 
 #ifdef __cuda_cuda_h__

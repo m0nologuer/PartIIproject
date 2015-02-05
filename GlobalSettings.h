@@ -6,6 +6,7 @@ class GlobalSettings
 {
 	Json::Value root;
 	Json::Reader reader;
+
 public:
 	//initialize
 	bool LoadFromJson(char* settings);
@@ -13,7 +14,11 @@ public:
 	// asset getter
 	char* getAssetLocation(char* name);
 
+	bool record_video();
+	char* video_file_name();
+
 	GlobalSettings();
 	~GlobalSettings();
 };
 
+ 
