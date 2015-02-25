@@ -8,6 +8,8 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
+#include <vector>
+
 #define aisgl_min(x,y) (x<y?x:y)
 #define aisgl_max(x,y) (y>x?y:x)
 
@@ -17,6 +19,7 @@ public:
 	ColladaLoader();
 	~ColladaLoader();
 	void render();
+	float* data(int& n);
 	bool inside_mesh(aiVector3D position);
 	int loadasset(const char* path);
 	const aiScene* getSceneObject();
@@ -37,5 +40,5 @@ private:
 	void recursive_render(const aiScene *sc, const aiNode* nd);
 	bool recursive_inside_mesh(const aiScene *sc, const aiNode* nd,
 		aiVector3D position);
-
+	void recursive_data(const aiScene *sc, const aiNode* nd, aiMatrix4x4 mat, std::vector<aiVector3D>& vertices);
 };

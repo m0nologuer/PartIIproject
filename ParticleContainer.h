@@ -39,10 +39,14 @@ public:
 	ParticleContainer();
 	~ParticleContainer();
 
-	void Init(char* texture, char* vertexShader, char* pixelShader);
+	void Init(char* texture, char* vertexShader, char* pixelShader, char* force_texture);
 	void Set(ColladaLoader* mesh, Config* settings);
 	void UpdateParticles(double delta);
 	void Draw();
+
+	void setMatrix(float* inverse_mat);
+	void setConstants(float v, float b);
+	void setForceTexture(unsigned char* tex, int width, int height);
 
 	//information getters
 	int getParticleCount();
@@ -53,6 +57,7 @@ public:
 private:
 	//CUDA accelerated physics
 	void CUDAloop(double delta);
+	void loadModel_CUDA();
 	void updateParticles_CUDA(double delta);
 	void findNeighbours_CUDA(float delta); 
 	void findNeighboursAtomic_CUDA(float delta);
@@ -72,14 +77,21 @@ private:
 	float* particle_predicted_pos_CUDA;
 
 	//determine neihgbours
-	int* counter_CUDA;
 	int* neighbours_CUDA;
 	int* grid_CUDA;
 	int* grid_index_CUDA;
 
+	//settings
+	float* constants_CUDA;
+
+	//for collisions
+	float* collision_data_CUDA;
+	int* collision_grid_CUDA;
+	float* matrix_CUDA;
+
 	//for testing
-	int grid_array[max_particle_count *8];
-	int grid_index_array[GRID_RES * GRID_RES * GRID_RES * 2];
+	int collision_grid_array[(SPARE_MEMORY_SIZE + GRID_RES*GRID_RES*GRID_RES) * BLOCK_SIZE];
+	int grid_array[max_particle_count * 8];
 	int neighbours_array[max_particle_count * MAX_NEIGHBOURS];
 	float lambdas_array[max_particle_count];
 

@@ -48,7 +48,7 @@ namespace ParticleSystemTests
 			Assert::IsTrue(settings.LoadFromJson("../../assets/settings.json"));
 			ColladaLoader model;
 			model.loadasset(settings.getAssetLocation("model_name"));
-			p_container.SetObstacle(&model);
+			//p_container.SetObstacle(&model);
 
 			int test_frame_count = 100;
 			for (int i = 0; i < test_frame_count; i++)

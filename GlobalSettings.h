@@ -13,9 +13,12 @@ public:
 
 	// asset getter
 	char* getAssetLocation(char* name);
+	float getConstant(char* name);
 
 	bool record_video();
 	char* video_file_name();
+
+	int particle_count();
 
 	GlobalSettings();
 	~GlobalSettings();

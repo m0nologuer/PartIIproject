@@ -57,6 +57,8 @@ void ParticleContainer::Set(ColladaLoader* m, Config* glob)
 	mesh = m;
 
 	settings.use_CUDA = true;
+
+	loadModel_CUDA();
 }
 std::string ParticleContainer::livePositionsList()
 {

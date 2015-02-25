@@ -1,10 +1,14 @@
 // For the CUDA runtime routines (prefixed with "cuda_")
 #include <cuda_runtime.h>
+#include <cuda_texture_types.h>
 #include <cuda.h>
 #include <stdio.h>
 #include <math_functions.h>
 #include <device_launch_parameters.h>
 #include "ParticleContainer.h"
+
+//force texture
+texture<uchar4, cudaTextureType2D, cudaReadModeElementType> external_force;
 
 void ParticleContainer::CUDAloop(double delta)
 {
@@ -116,14 +120,63 @@ extern "C" __device__ Particle::vec3 dW_spiky_cuda(Particle::vec3 r, float h)
 		return zero;
 	}
 }
-extern "C" __global__ void buildAtomicGrid(float *predicted_pos, int *grid, int* grid_index, float h,
-	float min_x, float min_y, float min_z, int* block_counter)
+extern "C" __device__ bool allocate_to_block(int grid_sq, int index, int *grid, int scramble,int memory_block)
+{
+	int next_block = memory_block;
+	//follow the chain of allocated memor  y blocks
+	//use atomicCAS for atomic reads
+	do{
+		memory_block = next_block;
+		next_block = atomicCAS(&grid[memory_block * BLOCK_SIZE + BLOCK_SIZE - 1], 0, 0); //no effect, just read
+	} while (next_block != 0);
+	
+	//put the index into this block
+	for (int block_id = 1; block_id < BLOCK_SIZE - 1; block_id++)
+		if (atomicCAS(&grid[memory_block * BLOCK_SIZE + block_id], 0, index + 1) == 0) //atomically update index if its free
+			return true;
+
+	return false;
+}
+
+extern "C" __device__ bool allocate(int grid_sq, int index, int *grid, int scramble)
+{
+	int memory_block = grid_sq;
+
+	bool allocated_index = allocate_to_block(grid_sq, index, grid, scramble, memory_block);
+
+	//if we run out of space, find a new block
+	if (!allocated_index)
+	{
+		//start by locking the pointer to the old block.
+		int prev_point_value = atomicCAS(&grid[memory_block * BLOCK_SIZE + BLOCK_SIZE - 1], 0, -1);
+		if (prev_point_value != 0)
+			return false; //if we can't get the lock
+		
+		//random starting position
+		int start_block = ((scramble + 1) * index * (SPARE_MEMORY_SIZE - 1) + scramble) % SPARE_MEMORY_SIZE;
+		for (int i = 0; i < SPARE_MEMORY_SIZE; i++)
+		{
+			int current_block = GRID_RES * GRID_RES * GRID_RES + (start_block + i) % SPARE_MEMORY_SIZE;
+			if (atomicCAS(&grid[current_block * BLOCK_SIZE], 0, index + 1) == 0) //claim a blank block of memory
+			{
+				//set the locked pointer to the new block of memory
+				atomicCAS(&grid[memory_block * BLOCK_SIZE + BLOCK_SIZE - 1], -1, current_block);
+				return true;
+			}
+		} 
+		return false;
+	}
+	return true;
+
+}
+extern "C" __global__ void buildAtomicGrid(float *predicted_pos, int *grid, float h,
+	float min_x, float min_y, float min_z, int scramble)
 {
 	int index = blockDim.x * blockIdx.x + threadIdx.x; //thread id, from 0 to MAX_PARTICL E_COUNT
 
 	//fill up grid 
 	if (index < MAX_PARTICLE_COUNT)
-	{ 
+	{
 		float * pos = &predicted_pos[3 * index];
 		int i = (pos[0] - min_x) / h;
 		int j = (pos[1] - min_y) / h;
@@ -134,47 +187,21 @@ extern "C" __global__ void buildAtomicGrid(float *predicted_pos, int *grid, int*
 		if (within_range)
 		{
 			int grid_sq = i * GRID_RES * GRID_RES + j * GRID_RES + k;
-			int memory_id = grid_index[2 * grid_sq + 1];
-			int memory_block = grid_index[2 * grid_sq];
-
-			//filling up the grid
-			//if we're still on the first block
-			if (memory_block == 0)
-				grid[memory_id + 8 * grid_sq] = index;
-			//otherwise...
-			else 
-				grid[memory_id + 8 * (memory_block + GRID_RES * GRID_RES * GRID_RES)] = index;
-
-			memory_id++;
-
-			//if this block is not yet filled up
-			if (memory_id < 7)
-				atomicAdd(&grid_index[2 * grid_sq + 1], 1);
-			//otherwise find a new block
-			else
-			{
-				//set reference to next m,emorty block
-				atomicExch(&grid[7 + 8 * memory_block], *block_counter);
-
-				//set the references for the new block and increment the block counter 
-				atomicExch(&grid_index[2 * grid_sq], 0);
-				atomicExch(&grid_index[2 * grid_sq + 1], *block_counter);
-				atomicAdd(block_counter,1);
-			}
-
-
+			for (int i = 0; i < 3; i++)
+				if (allocate(grid_sq, index, grid, scramble))
+					break;
 		}
 	}
 }
 extern "C" __global__ void buildGrid(float *predicted_pos, int *grid, float h,
-	float min_x, float min_y, float min_z)
+	float min_x, float min_y, float min_z, int step, int size)
 {
 	int index = blockDim.x * blockIdx.x + threadIdx.x; //thread id, from 0 to MAX_PARTICL E_COUNT
 
 	//fill up grid 
-	if (index < MAX_PARTICLE_COUNT)
+	if (index < size)
 	{
-		float * pos = &predicted_pos[3 * index];
+		float * pos = &predicted_pos[step * index];
 		int i = (pos[0] - min_x) / h;
 		int j = (pos[1] - min_y) / h;
 		int k = (pos[2] - min_z) / h;
@@ -217,13 +244,13 @@ __device__ void swap_grid_block(int *array, int index, int block_size, bool dire
 	swap_grid(array, i1, i2);
 
 }
-extern "C" __global__ void bitonicSortGrid(int *grid)
+extern "C" __global__ void bitonicSortGrid(int *grid, int grid_size)
 {
 	int index = blockDim.x * blockIdx.x + threadIdx.x; //thread id, from 0 to MAX_PARTICLE_COUNT/2
-	if (!(index < MAX_PARTICLE_COUNT/2))
+	if (!(index < grid_size/2))
 		return;
 
-	for (int i = 2; i <= MAX_PARTICLE_COUNT; i *= 2)
+	for (int i = 2; i <= grid_size; i *= 2)
 	{
 		swap_grid_block(grid, index, i, true);
 		__syncthreads();
@@ -274,15 +301,15 @@ extern "C" __global__ void sortGrid(int *grid)
 	}
 
 }
-extern "C" __global__ void buildIndex(int *grid, int *grid_index)
+extern "C" __global__ void buildIndex(int *grid, int *grid_index, int grid_size)
 {
 	int index = blockDim.x * blockIdx.x + threadIdx.x; //thread id, from 0 to MAX_PARTICL E_COUNT
 	if (!(index < GRID_RES*GRID_RES*GRID_RES))
 		return;
 
 	//search for grid value, where each cell is a rounded up predicted pos value
-	int start_index = MAX_PARTICLE_COUNT / 2;
-	int end_index = MAX_PARTICLE_COUNT / 2;
+	int start_index = grid_size / 2;
+	int end_index = grid_size / 2;
 	for (int step = start_index / 2; step > 0; step /= 2)
 	{
 		//find index to start of block
@@ -307,7 +334,7 @@ extern "C" __global__ void buildIndex(int *grid, int *grid_index)
 	else
 		grid_index[2 * index + 1] = -1;
 }  
-extern "C" __global__ void findNeighboursAtomicGrid(float *predicted_pos, int *grid, int* grid_index, int scramble,
+extern "C" __global__ void findNeighboursAtomicGrid(float *predicted_pos, int *grid, int scramble,
 	int* neighbour_indexes, float min_x, float min_y, float min_z, float h)
 {
 	int index = blockDim.x * blockIdx.x + threadIdx.x; //thread id, from 0 to MAX_PARTICL E_COUNT
@@ -338,24 +365,29 @@ extern "C" __global__ void findNeighboursAtomicGrid(float *predicted_pos, int *g
 				int r_k = ((k*scramble + scramble) % 3 - 1 + i_k + GRID_RES) % GRID_RES;
 
 				int grid_offsetted_val = r_i * GRID_RES * GRID_RES + r_j * GRID_RES + r_k;
-				int counter = grid_offsetted_val * 8;
-				int offset = grid[counter]; //start with the block allocated for this grid cell
+				int counter = grid_offsetted_val * BLOCK_SIZE;
+				int offset = grid[counter] - 1; //start with the block allocated for this grid cell
+				if (offset < 0)
+					continue; //skip empty cells
 				do{ 
 					//check all the neighbouring particles in this 
 					float distance = 0;
 					for (int i = 0; i < 3; i++)
 						distance += (pos[i] - predicted_pos[3 * offset + i]) * (pos[i] - predicted_pos[3 * offset + i]);
+					//if its close enough
 					if (distance < h_2)
 					{
 						neighbour_indexes[index*MAX_NEIGHBOURS + found_neighbours] = offset;
 						found_neighbours++;
 					}
 					 
+					//move onto next pos
 					counter++;
 					//if we reach the endof a block, usre the referenceto the next omne
-					if (counter % 8 == 0)
-						counter = grid[counter] * 8 + GRID_RES * GRID_RES * GRID_RES * 8;
-					offset = grid[counter];
+					if (counter % BLOCK_SIZE == BLOCK_SIZE - 1)
+						counter = (grid[counter] * BLOCK_SIZE);
+					offset = grid[counter] - 1;
+					 
 				} while (counter > 0 && offset > 0 && found_neighbours < MAX_NEIGHBOURS);
 			}
 	//fill up the rest of the neighbours
@@ -424,21 +456,11 @@ extern "C" __global__ void findNeighboursGrid(float *predicted_pos, int *grid, i
 		found_neighbours++;
 	}
 }
-extern "C" __device__  void applyForce(float* speed , float* pos, float* next_pos, float* life, float delta)
+extern "C" __device__  void triCollide(float* normal, float* position, float* dir_a, float* dir_b,
+	float* speed, float* pos, float* next_pos,  float delta)
 {
-	//uniform force
-	speed[0] += 0.9*delta*pos[0];
-	speed[1] += -9.81 * delta;
-	speed[2] += 0;
- 
-	// dummy
-	float normal[] = { 0.707, -0.707, 0 };
-	float position[] = { 0, -50, 0 };
-	float dir_a[] = { 10, 10, 0 };
-	float dir_b[] = { 0, 0, 10 };
-
 	float position_next[3];
-	float projection[3]; 
+	float projection[3];
 
 	//project pos onto the plane
 	for (int i = 0; i < 3; i++)
@@ -450,7 +472,8 @@ extern "C" __device__  void applyForce(float* speed , float* pos, float* next_po
 	float dir_a_dot = position_next[0] * dir_a[0] + position_next[1] * dir_a[1] + position_next[2] * dir_a[2];
 	float dir_b_dot = position_next[0] * dir_b[0] + position_next[1] * dir_b[1] + position_next[2] * dir_b[2];
 
-	if (dir_a_dot > 0 && dir_b_dot > 0 && dir_a_dot + dir_b_dot < 1)
+	//check triangle
+	if (!(dir_a_dot > 0 && dir_b_dot > 0 && dir_a_dot + dir_b_dot < 1))
 		return;
 
 	//if original point is on one side, moved point is on the other, apply correction
@@ -473,10 +496,78 @@ extern "C" __device__  void applyForce(float* speed , float* pos, float* next_po
 		for (int i = 0; i < 3; i++)
 			next_pos[i] -= normal[i] * (dot_after + 0.001);
 	}
+}
+extern "C" __device__  void applyForce(float* speed, float* pos, float* next_pos, float* life, float delta, 
+	 int* collide_grid, float* collide_data, float min_x, float min_y, float min_z, float h,
+	 float* matrix, float viscocity, float buoyancy)
+{
+	//uniform force + boyancy
+	speed[0] += 0;
+	speed[1] += -9.81 * delta - (life[0] - 2.5f)*buoyancy;
+	speed[2] += 0;
+
+	//viscous drag
+	for (int i = 0; i < 3; i++)
+		speed[i] *= viscocity;
+
+	//texture lookup force
+	uchar4 velocity = tex2D(external_force, (pos[0] - min_x) / (h * GRID_RES), (pos[1] - min_y) / (h * GRID_RES));
+	speed[0] += velocity.x * delta;
+	speed[1] += velocity.y * delta;
+	speed[2] += velocity.z * delta;
+
+	//find grid cell
+	int i_i = (pos[0] - min_x) / h;
+	int i_j = (pos[1] - min_y) / h;
+	int i_k = (pos[2] - min_z) / h;
+
+	bool within_range = (i_i > 0 && i_i < h * GRID_RES) && (i_j > 0 && i_j < h * GRID_RES)
+		&& (i_k > 0 && i_k < h * GRID_RES);
+	if (!within_range)
+		return;
+
+	int grid_index = i_i * GRID_RES * GRID_RES + i_j * GRID_RES + i_k;
+	
+	float transformed_pos[] = { 0, 0, 0 };
+	float transformed__next_pos[] = { 0, 0, 0 };
+
+	for (int i = 0; i < 3; i++)
+	{
+		for (int j = 0; j < 3; j++)
+		{
+			transformed_pos[i] += matrix[4 * i + j] * pos[j];
+			transformed__next_pos[i] += matrix[4 * i + j] * next_pos[j];
+		}
+
+		transformed_pos[i] += matrix[4 * i + 4];
+		transformed__next_pos[i] += matrix[4 * i + 4];
+	}
+
+	int counter = grid_index * BLOCK_SIZE;
+	int offset = collide_grid[counter] - 1; //start with the block allocated for this grid cell
+	while (counter > 0 && offset > 0)
+	{
+		//check all the neighbouring particles in this 
+		float* collide_tri_pos = &collide_data[offset * 3 * 4];
+		float* collide_tri_norm = collide_tri_pos + 3;
+		float* collide_tri_dir_a = collide_tri_pos + 6;
+		float* collide_tri_dir_b = collide_tri_pos + 9;
+
+		triCollide(collide_tri_norm, collide_tri_pos, collide_tri_dir_a, collide_tri_dir_b,
+			speed, transformed_pos, transformed__next_pos, delta);
+
+		//move onto next pos
+		counter++;
+		//if we reach the endof a block, usre the referenceto the next omne
+		if (counter % BLOCK_SIZE == BLOCK_SIZE - 1)
+			counter = (collide_grid[counter] * BLOCK_SIZE);
+		offset = collide_grid[counter] - 1;
+	} 
 };
 
 extern "C" __global__ void updateParticles(float delta, float *pos, float* predicted_pos, float* speed,
-	float* life, GLfloat* GL_positions, GLubyte* GL_colors, int scramble)
+	float* life, GLfloat* GL_positions, GLubyte* GL_colors, int scramble, int* collide_grid, float* collide_data,
+	float* matrix, float* settings)
 {
 	int i = blockDim.x * blockIdx.x + threadIdx.x; //thread id, from 0 to MAX_PARTICL E_COUNT
 
@@ -503,7 +594,8 @@ extern "C" __global__ void updateParticles(float delta, float *pos, float* predi
 			for (int j = 0; j < 3; j++)
 				speed[3 * i + j] = (predicted_pos[3 * i + j] - pos[3 * i + j])*(1 / delta);
 			//apply physics force
-			applyForce(&speed[3 * i], &pos[3 * i], &predicted_pos[3 * i], &life[i], delta);
+			applyForce(&speed[3 * i], &pos[3 * i], &predicted_pos[3 * i], &life[i], delta, 
+				 collide_grid, collide_data, -25, 75,-25, 5, matrix, settings[0], settings[1]);
 			//for next frame
 			for (int j = 0; j < 3; j++)
 			{
@@ -548,7 +640,7 @@ extern "C" __global__ void solverIterationPositions(float* predicted_pos, float*
 	//sort out indexes
 	int id = blockDim.x * blockIdx.x + threadIdx.x; //thread id, from 0 to MAX_PARTICLE_COUNT * MAX_NEIGHBOURS
 	int particle_index = id / MAX_NEIGHBOURS; //the particle we sum at
-	if (particle_index > MAX_PARTICLE_COUNT)
+	if (!(particle_index < MAX_PARTICLE_COUNT))
 		return;
 	int storage_index = threadIdx.x;
 	bool reducer = threadIdx.x % MAX_NEIGHBOURS == 0;
@@ -612,7 +704,7 @@ extern "C" __global__ void solverIterationLambdas(float *predicted_pos, const fl
 	//sort out indexes
 	int id = blockDim.x * blockIdx.x + threadIdx.x; //thread id, from 0 to MAX_PARTICLE_COUNT * MAX_NEIGHBOURS
 	int particle_index = id / MAX_NEIGHBOURS; //the particle we sum at
-	if (particle_index > MAX_PARTICLE_COUNT)
+	if (!(particle_index < MAX_PARTICLE_COUNT))
 		return;
 	int storage_index = threadIdx.x;
 	bool reducer = threadIdx.x % MAX_NEIGHBOURS == 0;
@@ -661,7 +753,33 @@ extern "C" __global__ void solverIterationLambdas(float *predicted_pos, const fl
 		lambda[particle_index] = -numerator/denominator;
 	}
 } 
-
+void ParticleContainer::setForceTexture(unsigned char* tex, int width, int height)
+{
+	//Allocate 2D memory on GPU. Also known as Pitch Linear Memory
+	uchar4* cuda_tex;
+	size_t gpu_image_pitch = 0;
+	width = 64;
+	height = 64;
+	gpuErrchk(cudaMallocPitch<uchar4>(&cuda_tex, &gpu_image_pitch, width, height));
+	//Copy data from host to device.
+	gpuErrchk(cudaMemcpy2D(cuda_tex, gpu_image_pitch, tex, width, width, height, cudaMemcpyHostToDevice));
+	//Bind the image to the texture =
+	cudaChannelFormatDesc desc = cudaCreateChannelDesc(8,8,8,8, cudaChannelFormatKindUnsigned);
+	gpuErrchk(cudaBindTexture2D(NULL, &external_force, cuda_tex, &desc, width, height, gpu_image_pitch));
+}
+void ParticleContainer::setMatrix(float* mat)
+{
+	size_t mem_size = sizeof(float) * 16;
+	gpuErrchk(cudaMemcpy(matrix_CUDA, mat, mem_size, cudaMemcpyHostToDevice));
+}
+void ParticleContainer::setConstants(float v, float b)
+{
+	float constants[16];
+	constants[0] = v;
+	constants[1] = b;
+	size_t mem_size = sizeof(float) * 16;
+	gpuErrchk(cudaMemcpy(constants_CUDA, constants, mem_size, cudaMemcpyHostToDevice));
+}
 void ParticleContainer::intialize_CUDA()
 {
 	//for solvers
@@ -679,11 +797,9 @@ void ParticleContainer::intialize_CUDA()
 	//for neighbours
 	mem_size = sizeof(int) * MAX_PARTICLE_COUNT * MAX_NEIGHBOURS;
 	gpuErrchk(cudaMalloc((void **)&neighbours_CUDA, mem_size));
-#ifdef ATOMIC_METHOD
-	mem_size = sizeof(int) * 1;
-	gpuErrchk(cudaMalloc((void **)&counter_CUDA, mem_size));
 
-	mem_size = sizeof(int) * MAX_PARTICLE_COUNT * 8;
+#ifdef ATOMIC_METHOD
+	mem_size = sizeof(int) * (SPARE_MEMORY_SIZE + GRID_RES * GRID_RES * GRID_RES)* BLOCK_SIZE;
 #else
 	mem_size = sizeof(int) * MAX_PARTICLE_COUNT;
 #endif
@@ -699,20 +815,31 @@ void ParticleContainer::intialize_CUDA()
 	mem_size = sizeof(GLubyte) * MAX_PARTICLE_COUNT * 4;
 	gpuErrchk(cudaMalloc((void **)&colors_CUDA, mem_size));
 
+	//for collisions
+	mem_size = sizeof(float) * MAX_FACE_COUNT * 4 * 3;
+	gpuErrchk(cudaMalloc((void **)&collision_data_CUDA, mem_size));
+	mem_size = sizeof(int) * (SPARE_MEMORY_SIZE + GRID_RES * GRID_RES * GRID_RES)* BLOCK_SIZE;
+	gpuErrchk(cudaMalloc((void **)&collision_grid_CUDA, mem_size));
+	mem_size = sizeof(float) * 16;
+	gpuErrchk(cudaMalloc((void **)&matrix_CUDA, mem_size));
+
+	mem_size = sizeof(float) * 16;
+	gpuErrchk(cudaMalloc((void **)&constants_CUDA, mem_size));
+
 	//init data
 	updateParticles << < 1, 512 >> >(0.2, particle_positions_CUDA,
 		particle_predicted_pos_CUDA, particle_speeds_CUDA, particle_life_CUDA,
-		positions_CUDA, colors_CUDA, 0);
+		positions_CUDA, colors_CUDA, 1, collision_grid_CUDA, collision_data_CUDA, matrix_CUDA, constants_CUDA);
 	//Error handling
 	gpuErrchk(cudaDeviceSynchronize());
 	gpuErrchk(cudaGetLastError());
-} 
+}
 void ParticleContainer::cleanup_CUDA()
 {
 	gpuErrchk(cudaFree((void **)&particle_positions_CUDA));
 	gpuErrchk(cudaFree((void **)&particle_lambdas_CUDA));
-	gpuErrchk(cudaFree((void **)&particle_speeds_CUDA));
-	gpuErrchk(cudaFree((void **)&particle_predicted_pos_CUDA));
+	gpuErrchk(cudaFree((void **)&particle_speeds_CUDA)) ;
+   	gpuErrchk(cudaFree((void **)&particle_predicted_pos_CUDA));
 	gpuErrchk(cudaFree((void **)&neighbours_CUDA));
 	gpuErrchk(cudaFree((void **)&colors_CUDA));
 	gpuErrchk(cudaFree((void **)&positions_CUDA));
@@ -729,7 +856,7 @@ void ParticleContainer::updateParticles_CUDA(double delta)
 	int blocksPerGrid = MAX_PARTICLE_COUNT / THREADS_PER_BLOCK + 1;
 	updateParticles << <blocksPerGrid, threadsPerBlock >> >(delta, particle_positions_CUDA, 
 		particle_predicted_pos_CUDA, particle_speeds_CUDA, particle_life_CUDA,
-		positions_CUDA, colors_CUDA, rand());
+		positions_CUDA, colors_CUDA, rand(), collision_grid_CUDA, collision_data_CUDA, matrix_CUDA, constants_CUDA);
 
 	//Error handling
 	gpuErrchk(cudaDeviceSynchronize());
@@ -744,33 +871,24 @@ void ParticleContainer::findNeighboursAtomic_CUDA(float delta)
 	int threadsPerBlock = THREADS_PER_BLOCK;
 	int blocksPerGrid = MAX_PARTICLE_COUNT / THREADS_PER_BLOCK + 1;
 
-	size_t mem_size = sizeof(int)*MAX_PARTICLE_COUNT * 8;
+	size_t mem_size = sizeof(int)*(SPARE_MEMORY_SIZE + GRID_RES * GRID_RES * GRID_RES) * BLOCK_SIZE;
 	gpuErrchk(cudaMemset((void*)grid_CUDA, 0, mem_size));
-	mem_size = sizeof(int)*GRID_RES*GRID_RES*GRID_RES * 2;
-	gpuErrchk(cudaMemset((void*)grid_index_CUDA, 0, mem_size));
-	mem_size = sizeof(int) * 1;
-	gpuErrchk(cudaMemset((void*)counter_CUDA, 0, mem_size));
 
-	buildAtomicGrid << <blocksPerGrid, threadsPerBlock >> >(particle_predicted_pos_CUDA, grid_CUDA, grid_index_CUDA,
-		5, -25, 75, -25, counter_CUDA);
+	buildAtomicGrid << <blocksPerGrid, threadsPerBlock >> >(particle_predicted_pos_CUDA, grid_CUDA,
+		5, -25, 75, -25, rand());
 	gpuErrchk(cudaDeviceSynchronize());
 	gpuErrchk(cudaGetLastError());
 	RECORD_SPEED("		Build atomic grid  %d ms \n");
 
 	blocksPerGrid = MAX_PARTICLE_COUNT / THREADS_PER_BLOCK + 1;
 	findNeighboursAtomicGrid << <blocksPerGrid, threadsPerBlock >> >(particle_predicted_pos_CUDA, grid_CUDA,
-		grid_index_CUDA, rand(), neighbours_CUDA, -25, 75, -25, 5);
+		 rand(), neighbours_CUDA, -25, 75, -25, 5);
 	gpuErrchk(cudaDeviceSynchronize());
 	gpuErrchk(cudaGetLastError());
 
 	RECORD_SPEED("		Use atomic grid to find particles  %d ms \n");
-
-	gpuErrchk(cudaMemcpy(neighbours_array, neighbours_CUDA, sizeof(int)*MAX_PARTICLE_COUNT*MAX_NEIGHBOURS, cudaMemcpyDeviceToHost));
-	gpuErrchk(cudaMemcpy(grid_array, grid_CUDA, sizeof(int)*MAX_PARTICLE_COUNT*8, cudaMemcpyDeviceToHost));
-	gpuErrchk(cudaMemcpy(grid_index_array, grid_index_CUDA, sizeof(int)*GRID_RES * GRID_RES * GRID_RES * 2, cudaMemcpyDeviceToHost));
-
 }
-void ParticleContainer::solverIterations_CUDA(float delta)
+ void ParticleContainer::solverIterations_CUDA(float delta)
 {
 	int start_time = glutGet(GLUT_ELAPSED_TIME);
 	int time;
@@ -797,6 +915,94 @@ void ParticleContainer::solverIterations_CUDA(float delta)
 		gpuErrchk(cudaGetLastError());
 	}
 }
+void buildCollisionGridCPU(float *collision_data, int *grid, float h, float min_x, float min_y, float min_z, int scramble, int size)
+ {
+	int next_block = GRID_RES*GRID_RES*GRID_RES;
+
+	for (int index = 0; index < size; index++)
+	 {
+		 float * pos = &collision_data[3 * 4 * index];
+		 float * dir1 = &collision_data[3 * 4 * index + 6];
+		 float * dir2 = &collision_data[3 * 4 * index + 9];
+
+		 float scale_factor_1 = h / (max(abs(dir1[0]), max(abs(dir1[1]), abs(dir1[2]))));
+		 float length_1 = 1.0f/sqrt(dir1[0] * dir1[0] + dir1[1] * dir1[1] + dir1[2] * dir1[2]); //already invcerted
+
+		 float scale_factor_2 = h / (max(abs(dir2[0]), max(abs(dir2[1]), abs(dir2[2]))));
+		 float length_2 = 1.0f/sqrt(dir2[0] * dir2[0] + dir2[1] * dir2[1] + dir2[2] * dir2[2]);
+
+		 for (float a = 0; a < length_1*length_1; a += scale_factor_1*length_1)
+			 for (float b = 0; b < length_2*length_2; b += scale_factor_2*length_2)
+			 {
+				 float new_pos[3];
+				 new_pos[0] = pos[0] + a*dir1[0] + b*dir2[0];
+				 new_pos[1] = pos[1] + a*dir1[1] + b*dir2[1];
+				 new_pos[2] = pos[2] + a*dir1[2] + b*dir2[2];
+
+				 int i = (new_pos[0] - min_x) / h;
+				 int j = (new_pos[1] - min_y) / h;
+				 int k = (new_pos[2] - min_z) / h;
+
+				 bool within_range = (i > 0 && i < h * GRID_RES) && (j > 0 && j < h * GRID_RES)
+					 && (k > 0 && k < h * GRID_RES);
+				 if (within_range)
+				 {
+					 int grid_sq = i * GRID_RES * GRID_RES + j * GRID_RES + k;
+
+					 //follow the chain to the correct block
+					 int allocated_block = grid_sq;
+					 while (grid[allocated_block*BLOCK_SIZE + BLOCK_SIZE - 1] > 0 && allocated_block < 
+						 SPARE_MEMORY_SIZE + GRID_RES * GRID_RES * GRID_RES){
+						 allocated_block = grid[allocated_block*BLOCK_SIZE + BLOCK_SIZE - 1];
+					 }
+
+					 //search for a free square
+					 bool found = false;
+					 for (int i = 1; i < BLOCK_SIZE - 1; i++)
+						 if (grid[allocated_block*BLOCK_SIZE + i] == 0)
+						 {
+							grid[allocated_block*BLOCK_SIZE + i] = index + 1;
+							 found = true;
+						 }
+
+					 //allocate a new block
+					 if (!found)
+					 {
+						 grid[allocated_block*BLOCK_SIZE + BLOCK_SIZE - 1] = next_block;
+						 grid[next_block*BLOCK_SIZE] = index + 1;
+						 next_block++;
+					 }
+			 }
+		}
+	 }
+ }
+void ParticleContainer::loadModel_CUDA()
+{
+	int start_time = glutGet(GLUT_ELAPSED_TIME);
+	int time;
+
+	int n;
+	float* collision_data = mesh->data(n);
+	gpuErrchk(cudaMemcpy(collision_data_CUDA, collision_data, n * 12, cudaMemcpyHostToDevice));
+
+	/*
+	//find neigbours for next iteration
+	int threadsPerBlock = THREADS_PER_BLOCK;
+	int blocksPerGrid = MAX_FACE_COUNT / THREADS_PER_BLOCK + 1;
+	buildCollisionGrid << <blocksPerGrid, threadsPerBlock >> >(collision_data_CUDA, collision_grid_CUDA,
+		5, -25, -75, -25, rand(), n);
+	gpuErrchk(cudaDeviceSynchronize());
+	gpuErrchk(cudaGetLastError());
+	*/
+
+	int mem_size = (SPARE_MEMORY_SIZE + GRID_RES*GRID_RES*GRID_RES) * BLOCK_SIZE * sizeof(int);
+	memset(collision_grid_array, 0, mem_size);
+	buildCollisionGridCPU(collision_data, collision_grid_array, 5, -25, -75, -25, rand(), n);
+
+	gpuErrchk(cudaMemcpy(collision_grid_CUDA, collision_grid_array, mem_size, cudaMemcpyHostToDevice));
+	RECORD_SPEED("		Build colllision grid  %d ms \n");
+}
+
 void ParticleContainer::findNeighbours_CUDA(float delta)
 {
 	int start_time = glutGet(GLUT_ELAPSED_TIME);
@@ -806,20 +1012,20 @@ void ParticleContainer::findNeighbours_CUDA(float delta)
 	int threadsPerBlock = THREADS_PER_BLOCK;
 	int blocksPerGrid = MAX_PARTICLE_COUNT / THREADS_PER_BLOCK + 1;
 	buildGrid << <blocksPerGrid, threadsPerBlock >> >(particle_predicted_pos_CUDA, grid_CUDA,
-		5, -25, -75, -25);
+		5, -25, -75, -25, 3, MAX_PARTICLE_COUNT);
 	gpuErrchk(cudaDeviceSynchronize());
 	gpuErrchk(cudaGetLastError());
 	RECORD_SPEED("		Build grid  %d ms \n");
 
 	//sort the grid
-	bitonicSortGrid << <blocksPerGrid, threadsPerBlock >> >(grid_CUDA);
+	bitonicSortGrid << <blocksPerGrid, threadsPerBlock >> >(grid_CUDA, MAX_PARTICLE_COUNT);
 	gpuErrchk(cudaDeviceSynchronize());
 	gpuErrchk(cudaGetLastError());
 	RECORD_SPEED("		Sort grid  %d ms \n");
 
 	//build index
 	blocksPerGrid = GRID_RES * GRID_RES * GRID_RES / THREADS_PER_BLOCK + 1;
-	buildIndex << <blocksPerGrid, threadsPerBlock >> >(grid_CUDA, grid_index_CUDA);
+	buildIndex << <blocksPerGrid, threadsPerBlock >> >(grid_CUDA, grid_index_CUDA, MAX_PARTICLE_COUNT);
 	gpuErrchk(cudaDeviceSynchronize());
 	gpuErrchk(cudaGetLastError());
 	RECORD_SPEED("		Build index  %d ms \n");

@@ -1,4 +1,5 @@
 #include "COLLADALoader.h"
+#include <math.h>
 
 ColladaLoader::ColladaLoader(){
 
@@ -115,6 +116,84 @@ bool ColladaLoader::recursive_inside_mesh(const aiScene *sc, const aiNode* nd, a
 	  
 	return intersection;
 }
+float* ColladaLoader::data(int& block_size){
+
+	std::vector<aiVector3D> vertices;
+
+	//transform
+	float tmp = scene_max.x - scene_min.x;
+	tmp = std::max(scene_max.y - scene_min.y, tmp);
+	tmp = std::max(scene_max.z - scene_min.z, tmp);
+	tmp = tmp/0.7f;
+
+	aiMatrix4x4 identity = aiMatrix4x4(aiVector3D(tmp, tmp, tmp), aiQuaternion(), scene_center);
+	recursive_data(scene, scene->mRootNode, identity, vertices);
+	block_size = vertices.size();
+
+	float* data_blob = new float[4 * vertices.size()];
+	float* p_data = data_blob;
+	for (int i = 0; i < vertices.size(); i+=3)
+	{
+		float* pos = data_blob;
+		float* normal = data_blob + 3;
+		float* dir1 = data_blob + 6;
+		float* dir2 = data_blob + 9;
+
+		pos[0] = vertices[i].x;
+		pos[1] = vertices[i].y;
+		pos[2] = vertices[i].z;
+
+		aiVector3D dir1_v = vertices[i + 2] - vertices[i];
+		aiVector3D dir2_v = vertices[i + 1] - vertices[i];
+		aiVector3D normal_v = dir1_v.SymMul(dir2_v);
+		normal[0] = normal_v.x;
+		normal[1] = normal_v.y;
+		normal[2] = normal_v.z;
+
+		dir1_v *= 1.0f / dir1_v.SquareLength();
+		dir2_v *= 1.0f / dir2_v.SquareLength();
+
+		dir1[0] = dir1_v.x;
+		dir1[1] = dir1_v.y;
+		dir1[2] = dir1_v.z;
+
+		dir2[0] = dir2_v.x;
+		dir2[1] = dir2_v.y;
+		dir2[2] = dir2_v.z;
+
+		data_blob += 12;
+	}
+
+	return p_data;
+}
+void ColladaLoader::recursive_data(const aiScene *sc, const aiNode* nd, aiMatrix4x4 mat, std::vector<aiVector3D>& vertices)
+{
+	unsigned int i;
+	unsigned int n = 0, t;
+	aiMatrix4x4 m = nd->mTransformation;
+	mat *= m;
+
+	// draw all meshes assigned to this node
+	for (; n < nd->mNumMeshes; ++n) {
+		const aiMesh* mesh = sc->mMeshes[nd->mMeshes[n]];
+		for (t = 0; t < mesh->mNumFaces; ++t) {
+			const aiFace* face = &mesh->mFaces[t];
+			if (face->mNumIndices != 3)
+				break;
+			for (i = 0; i < face->mNumIndices; i++) {
+				int index = face->mIndices[i];
+				aiVector3D vec = mesh->mVertices[index];
+				vec *= mat;
+				vertices.push_back(vec);
+			}
+		}
+	}
+
+	// draw all children
+	for (n = 0; n < nd->mNumChildren; ++n) {
+		recursive_data(sc, nd->mChildren[n], mat, vertices);
+	}
+}
 // ----------------------------------------------------------------------------
 void ColladaLoader::render(){
 	recursive_render(scene, scene->mRootNode);
@@ -186,9 +265,9 @@ int ColladaLoader::loadasset(const char* path)
 
 	if (scene) {
 		get_bounding_box(&scene_min, &scene_max);
-		scene_center.x = (scene_min.x + scene_max.x) / 2.0f;
-		scene_center.y = (scene_min.y + scene_max.y) / 2.0f;
-		scene_center.z = (scene_min.z + scene_max.z) / 2.0f;
+		scene_center.x = (scene_min.x + scene_max.x) / 2.0f ;
+		scene_center.y = (scene_min.y + scene_max.y) / 2.0f + 1;
+		scene_center.z = (scene_min.z + scene_max.z) / 2.0f + 2;
 		return 0;
 	}
 	return 1;

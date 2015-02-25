@@ -38,7 +38,7 @@ void do_motion(void)
 	static int frames = 0;
 
 	int time = glutGet(GLUT_ELAPSED_TIME);
-	c_loader.angle += (time - prev_time)*0.01;
+	c_loader.angle += (time - prev_time)*0.1;
 	printf("%d cycle time\n", time - prev_time);
 	p_container.UpdateParticles(0.02); //fixed time interval
 	prev_time = time;
@@ -65,20 +65,40 @@ void display(void)
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-	gluLookAt(0.f, 0.f, 3.f, 0.f, 0.f, -5.f, 0.f, 1.f, 0.f);
+
 
 	// rotate it around the y axis
 	glRotatef(c_loader.angle, 0.f, 1.f, 0.f);
+
+	GLfloat matrix[16];
+	glGetFloatv(GL_MODELVIEW_MATRIX, matrix);
+	aiMatrix4x4 inverse_mat(matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5], matrix[6], matrix[7], matrix[8],
+		matrix[9], matrix[10], matrix[11], matrix[12], matrix[13], matrix[14], matrix[15]);
+	inverse_mat.Inverse();
+	matrix[0] = inverse_mat.a1; matrix[1] = inverse_mat.a2; matrix[2] = inverse_mat.a3; matrix[3] = inverse_mat.a4;
+	matrix[4] = inverse_mat.b1; matrix[5] = inverse_mat.b2; matrix[6] = inverse_mat.b3; matrix[7] = inverse_mat.b4;
+	matrix[8] = inverse_mat.c1; matrix[9] = inverse_mat.c2; matrix[10] = inverse_mat.c3; matrix[11] = inverse_mat.c4;
+	matrix[12] = inverse_mat.d1; matrix[13] = inverse_mat.d2; matrix[14] = inverse_mat.d3; matrix[15] = inverse_mat.d4;
+	p_container.setMatrix(matrix);
+
+	// rotate it around the y axis
+	glRotatef(-c_loader.angle, 0.f, 1.f, 0.f);
+
+	gluLookAt(0.f, 0.f, 3.f, 0.f, 0.f, -5.f, 0.f, 1.f, 0.f);
+
 
 	// scale the whole asset to fit into our view frustum 
 	tmp = c_loader.scene_max.x - c_loader.scene_min.x;
 	tmp = aisgl_max(c_loader.scene_max.y - c_loader.scene_min.y, tmp);
 	tmp = aisgl_max(c_loader.scene_max.z - c_loader.scene_min.z, tmp);
-	tmp = 1.f / tmp;
+	tmp = 0.7f / tmp;
 	glScalef(tmp, tmp, tmp);
 
 	// center the model
 	glTranslatef(-c_loader.scene_center.x, -c_loader.scene_center.y, -c_loader.scene_center.z);
+
+	// rotate it around the y axis
+	glRotatef(c_loader.angle, 0.f, 1.f, 0.f);
 
 	// if the display list has not been made yet, create a new one and
 	// fill it with scene contents
@@ -89,7 +109,7 @@ void display(void)
 		glEndList();
 	}
 
-	//glCallList(scene_list);
+	glCallList(scene_list);
 
 	p_container.Draw();
 
@@ -152,8 +172,9 @@ int main(int argc, char **argv)
 	// the model name can be specified in the settings.
 	char* model_name = settings.getAssetLocation("model_name");
 	c_loader.loadasset(model_name);
-	//p_container.SetObstacle(&c_loader);
-
+	p_container.Set(&c_loader, NULL);
+	p_container.setConstants(settings.getConstant("viscosity"), settings.getConstant("buoyancy"));
+		 
 	glClearColor(0.1f,0.1f,0.1f,1.f);
 
 	glEnable(GL_LIGHTING);
@@ -176,7 +197,7 @@ int main(int argc, char **argv)
 
 	p_container.Init(settings.getAssetLocation("particle_image"),
 		settings.getAssetLocation("vertex_shader"),
-		settings.getAssetLocation("pixel_shader"));
+		settings.getAssetLocation("pixel_shader"), settings.getAssetLocation("force_image"));
 
 	glutGet(GLUT_ELAPSED_TIME);
 	glutMainLoop();

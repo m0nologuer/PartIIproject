@@ -2,7 +2,22 @@
 #include "util/shader.hpp"
 #include "util/texture.hpp"
 
-void ParticleContainer::Init(char* texture, char* vertexShader, char* pixelShader)
+bool getTextureBlob(GLuint texture, int level, int& w, int& h, unsigned char **pixels)
+{
+	int format;
+	glBindTexture(0, texture);
+	glGetTexLevelParameteriv(0, 0, GL_TEXTURE_INTERNAL_FORMAT, &format);
+	glGetTexLevelParameteriv(0, 0, GL_TEXTURE_WIDTH, &w);
+	glGetTexLevelParameteriv(0, 0, GL_TEXTURE_HEIGHT, &h);
+	if (w == 0 || h == 0)
+		return false;
+	unsigned int size = w *h *sizeof(unsigned char);
+	*pixels = new unsigned char[size];
+	glPixelStorei(GL_PACK_ALIGNMENT, 1);
+	glGetTexImage(0, level, format, GL_UNSIGNED_BYTE, *pixels);
+}
+
+void ParticleContainer::Init(char* texture, char* vertexShader, char* pixelShader, char* force_texture)
 {
 	//initalized matrices
 	glGetFloatv(GL_MODELVIEW_MATRIX, (GLfloat*)&viewMat);
@@ -16,6 +31,14 @@ void ParticleContainer::Init(char* texture, char* vertexShader, char* pixelShade
 	viewVec2ID = glGetUniformLocation(programID, "CameraUp_worldspace");
 	vpMatID = glGetUniformLocation(programID, "Proj");
 	billboardTextureID = loadDDS(texture);
+
+	//for the external force
+	GLuint f_tex = loadDDS(force_texture);
+	unsigned char* tex = NULL;
+	int width;
+	int height;
+	getTextureBlob(f_tex, 0, width, height, &tex);
+	setForceTexture(tex, width, height);
 
 	initializeBuffers();
 }

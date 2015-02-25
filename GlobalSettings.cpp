@@ -21,10 +21,17 @@ bool GlobalSettings::record_video()
 char* GlobalSettings::video_file_name(){
 	char* s = new char[4096];
 	char* string =(char*)root["output"]["jpeg_folder"].asCString();
-	memcpy(s, string, 2048);
+	memcpy(s, string, 256);
 
 	return s;
-
+}
+int GlobalSettings::particle_count(){
+	return root["settings"]["particle_count"].asInt();
+}
+float GlobalSettings::getConstant(char* name)
+{
+	char* s = new char[256];
+	return root["constants"][name].asFloat();
 }
 char* GlobalSettings::getAssetLocation(char* name)
 {

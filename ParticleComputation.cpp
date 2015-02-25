@@ -20,6 +20,9 @@ void ParticleContainer::applyPhysics(double delta)
 	int total_neighbours = 0;
 	int total_particles = 0; 
 	int max_neighbouts = 0;
+	int max_over_8 = 0;
+	int max_over_4 = 0;
+	int max_over_16 = 0;
 
 	//update data structure
 	for (int i = 0; i < max_particle_count; i++){
@@ -42,11 +45,27 @@ void ParticleContainer::applyPhysics(double delta)
 			total_particles++;
 			if (neighbours[i].size()>max_neighbouts)
 				max_neighbouts = neighbours[i].size();
+
+			if (neighbours[i].size() > 4)
+			{
+				max_over_4++;
+				if (neighbours[i].size() > 8)
+				{
+					max_over_8++;
+					if (neighbours[i].size() > 16)
+						max_over_16++;
+				}
+			}
+
 		}
 	}
 	float avaerage_n = total_neighbours / (float)total_particles;
-	
-	printf("%d p, %f average n, %d max", total_particles, avaerage_n, max_neighbouts);
+
+	printf("%d p, %f average n, %d max, %d ov4, %d ov8, %d, ov16", total_particles, avaerage_n, max_neighbouts,
+		max_over_4, max_over_8, max_over_16);
+
+	fprintf(csv, "%d, %f, %d, %d, %d, %d \n", total_particles, avaerage_n, max_neighbouts,
+		max_over_4, max_over_8, max_over_16);
 
 	RECORD_SPEED("	Find neighbours  %d ms \n");
 
