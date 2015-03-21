@@ -676,17 +676,22 @@ extern "C" __device__  bool triCollide(float* normal, float* tri_a, float* tri_b
 		if (in_triangle(intersection_point, tri_a, tri_b, tri_c))
 		{
 			float perpendicular_component = dot(velocity, normal);
-
+			 
 			//reflect of the plane
 			float impulse[3];
-			multiply(velocity, -2 * perpendicular_component, impulse);
+			multiply(normal, -2 * perpendicular_component, impulse);
 			add(velocity, impulse, velocity);
+			subtract(velocity, velocity, velocity);
 
+			/*
 			//move the particle back over the boundary
-			float speed = sqrt(dot(velocity, velocity));
-			multiply(velocity, delta*(1 - interpolation), impulse);
+			float movement_vector[3];
+			subtract(next_pos, pos, movement_vector);
+			float interval_distance = sqrt(dot(movement_vector, movement_vector));
+			multiply(velocity, (1 - interpolation)*interval_distance, impulse);
 			add(intersection_point, impulse, intersection_point);
 			set(next_pos, intersection_point);
+			*/
 
 			return true;
 		}
@@ -738,9 +743,8 @@ extern "C" __device__  void collisions(float* speed, float* pos, float* next_pos
 		float* collide_tri_dir_a = collide_tri_pos + 6;
 		float* collide_tri_dir_b = collide_tri_pos + 9;
 
-		if (triCollide(collide_tri_norm, collide_tri_pos, collide_tri_dir_a, collide_tri_dir_b,
-			speed, transformed_pos, transformed__next_pos, delta))
-			break;
+		(triCollide(collide_tri_norm, collide_tri_pos, collide_tri_dir_a, collide_tri_dir_b,
+			speed, transformed_pos, transformed__next_pos, delta));
 
 		offset++;
 		/*
