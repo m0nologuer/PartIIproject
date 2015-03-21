@@ -38,7 +38,10 @@ char* GlobalSettings::getAssetLocation(char* name)
 	char* s = new char[256];
 	char* string = (char*)root["assets"][name].asCString();
 
-	memcpy(s, string, 256);
+	if (string)
+		memcpy(s, string, 256);
+	else
+		s = NULL;
 
 	return s;
 }

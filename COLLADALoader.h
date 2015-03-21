@@ -41,4 +41,5 @@ private:
 	bool recursive_inside_mesh(const aiScene *sc, const aiNode* nd,
 		aiVector3D position);
 	void recursive_data(const aiScene *sc, const aiNode* nd, aiMatrix4x4 mat, std::vector<aiVector3D>& vertices);
+	void applyMatrix(const aiScene *sc, const aiNode* nd, aiMatrix4x4 mat);
 };

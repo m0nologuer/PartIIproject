@@ -43,6 +43,7 @@ public:
 	void Set(ColladaLoader* mesh, Config* settings);
 	void UpdateParticles(double delta);
 	void Draw();
+	void DrawPoints();
 
 	void setMatrix(float* inverse_mat);
 	void setConstants(float v, float b);
@@ -91,7 +92,7 @@ private:
 
 	//for testing
 	int collision_grid_array[(SPARE_MEMORY_SIZE + GRID_RES*GRID_RES*GRID_RES) * BLOCK_SIZE];
-	int grid_array[max_particle_count * 8];
+	int grid_array[(SPARE_MEMORY_SIZE + GRID_RES*GRID_RES*GRID_RES) * BLOCK_SIZE];
 	int neighbours_array[max_particle_count * MAX_NEIGHBOURS];
 	float lambdas_array[max_particle_count];
 

@@ -4,16 +4,17 @@
 #define RECORD_SPEED(x) time = glutGet(GLUT_ELAPSED_TIME); printf(x, time-start_time); start_time = time;
 
 #define ATOMIC_METHOD
-#ifdef ATOMIC_METHOD
 #define BLOCK_SIZE 8
 #define SPARE_MEMORY_SIZE MAX_PARTICLE_COUNT*2
-#endif
 #define MAX_NEIGHBOURS 8
-#define GRID_RES 16
+#define GRID_RES 32
+#define GRID_X -50
+#define GRID_Y -75
+#define GRID_Z -50
 #define THREADS_PER_BLOCK 512
 #define MAX_THREADS 512
 #define EPSILON 0.00001
-#define MAX_FACE_COUNT 5000
+#define MAX_FACE_COUNT 9000
 #define MAX_PARTICLE_COUNT 6000
 #define max_particle_count MAX_PARTICLE_COUNT
 

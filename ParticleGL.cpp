@@ -33,13 +33,15 @@ void ParticleContainer::Init(char* texture, char* vertexShader, char* pixelShade
 	billboardTextureID = loadDDS(texture);
 
 	//for the external force
-	GLuint f_tex = loadDDS(force_texture);
-	unsigned char* tex = NULL;
-	int width;
-	int height;
-	getTextureBlob(f_tex, 0, width, height, &tex);
-	setForceTexture(tex, width, height);
-
+	if (force_texture)
+	{
+		GLuint f_tex = loadDDS(force_texture);
+		unsigned char* tex = NULL;
+		int width;
+		int height;
+		getTextureBlob(f_tex, 0, width, height, &tex);
+		setForceTexture(tex, width, height);
+	}
 	initializeBuffers();
 }
 
@@ -80,6 +82,57 @@ void ParticleContainer::updateGLBuffers()
 	glBufferData(GL_ARRAY_BUFFER, max_particle_count * 4 * sizeof(GLubyte), NULL, GL_STREAM_DRAW); // Buffer orphaning, a common way to improve streaming perf. See above link for details.
 	glBufferSubData(GL_ARRAY_BUFFER, 0, render_counter * sizeof(GLubyte) * 4, g_particle_color_data);
 
+}
+void ParticleContainer::DrawPoints()
+{
+	updateGLBuffers();
+
+	glEnable(GL_PROGRAM_POINT_SIZE);
+
+	// Use our shader
+	glUseProgram(programID);
+
+	//initalized matrices
+	//glGetFloatv(GL_MODELVIEW_MATRIX, (GLfloat*)&viewMat);
+	glGetFloatv(GL_PROJECTION_MATRIX, (GLfloat*)&projMat);
+
+	// sample settings for billboards
+	glUniform3f(viewVec1ID, viewMat[0][0], viewMat[1][0], viewMat[2][0]);
+	glUniform3f(viewVec2ID, viewMat[0][1], viewMat[1][1], viewMat[2][1]);
+	glUniformMatrix4fv(vpMatID, 1, GL_FALSE, &projMat[0][0]);
+
+
+	// 1st attribute buffer : positions of particles' centers
+	glEnableVertexAttribArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, particles_position_buffer);
+	glVertexAttribPointer(
+		0, // attribute. No particular reason for 1, but must match the layout in the shader.
+		4, // size : x + y + z + size => 4
+		GL_FLOAT, // type
+		GL_FALSE, // normalized?
+		0, // stride
+		(void*)0 // array buffer offset
+		);
+
+	// 2nd attribute buffer : particles' colors
+	glEnableVertexAttribArray(1);
+	glBindBuffer(GL_ARRAY_BUFFER, particles_color_buffer);
+	glVertexAttribPointer(
+		1, // attribute. No particular reason for 1, but must match the layout in the shader.
+		4, // size : r + g + b + a => 4
+		GL_UNSIGNED_BYTE, // type
+		GL_TRUE, // normalized? *** YES, this means that the unsigned char[4] will be accessible with a vec4 (floats) in the shader ***
+		0, // stride
+		(void*)0 // array buffer offset
+		);
+
+	//glVertexAttribDivisor(0, 0); // positions : one per quad (its center) -> 1
+	//glVertexAttribDivisor(1, 0); // color : one per quad -> 1
+
+	glDrawArrays(GL_POINTS, 0, render_counter);
+
+	//disable shader
+	glUseProgram(0);
 }
 void ParticleContainer::Draw()
 {
