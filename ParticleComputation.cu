@@ -581,11 +581,31 @@ extern "C" __device__  void cross(float* p, float* q, float* result)
 	result[1] = p[0] * q[2] - p[2] * q[0];
 	result[2] = p[1] * q[0] - p[0] * q[1];
 }
+extern "C" __device__  void add(float* p, float* q, float* output)
+{
+	for (int i = 0; i < 3; i++)
+		output[i] = p[i] + q[i];
+}
+extern "C" __device__  void multiply(float* p, float q, float* output)
+{
+	for (int i = 0; i < 3; i++)
+		output[i] = p[i] * q;
+}
 extern "C" __device__  float dot(float* p, float* q)
 {
 	return p[0] * q[0] + p[1] * q[1] + p[2] * q[2];
 }
-extern "C" __device__  bool in_triangle(float* p, float* normal, float* p0, float* p1, float* p2)
+extern "C" __device__  void lerp(float* p, float* q, float r, float* output)
+{
+	for (int i = 0; i < 3; i++)
+		output[i] = p[i] * r + q[i] * (1 - r);
+}
+extern "C" __device__  void set(float* p, float* q)
+{
+	for (int i = 0; i < 3; i++)
+		q[i] = p[i];
+}
+extern "C" __device__  bool in_triangle(float* p, float* p0, float* p1, float* p2)
 {
 	// Compute vectors
 	float v0[3];
@@ -621,65 +641,39 @@ extern "C" __device__  bool in_triangle(float* p, float* normal, float* p0, floa
 	// Check if point is in triangle
 	return (u >= 0) && (v >= 0) && (u + v < denom);
 }
-extern "C" __device__  bool s_cross(float* p, float* normal, float* p1, float* p2)
+extern "C" __device__  bool triCollide(float* normal, float* tri_a, float* tri_b, float* tri_c,
+	float* velocity, float* pos, float* next_pos, float delta)
 {
-	//determines if p and q are on the same side of the line dilineated by p1, p2
-	float dir[3];
-	float edge_dir[3];
-	//create intermediate vectors
-	for (int i = 0; i < 3; i++)
+	float plane_height = dot(tri_a, normal);
+	float pos_height_before = dot(pos, normal);
+	float pos_height_after = dot(next_pos, normal);
+
+	//if particle position before and after the timestep are on opposite sides of the plane 
+	if ((pos_height_after - plane_height)* (pos_height_before - plane_height) < 0)
 	{
-		dir[i] = p[i] - p1[i];
-		edge_dir[i] = p2[i] - p1[i];
-	}
-	//calculate orthogonal vector
-	float ortho[3];
-	cross(edge_dir, normal, ortho);
+		//calculate intersection point
+		float intersection_point[3];
+		float interpolation = (plane_height - pos_height_before) / (pos_height_after - pos_height_before);
+		lerp(pos, next_pos, interpolation, intersection_point);
 
-	//dot product to see if they are the same side
-	float dot = 0;
-	for (int i = 0; i < 3; i++){
-		dot += ortho[i] * dir[i];
-	}
-	//return the sign
-	return (dot > 0);
-}
-extern "C" __device__  bool triCollide(float* normal, float* position, float* pos_a, float* pos_b,
-	float* speed, float* pos, float* next_pos, float delta, int offset)
-{
-	//check if we're inside the triangle
-	if (!in_triangle(next_pos, normal, position, pos_a, pos_b))
-		return false;
-
-	//project pos onto the plane
-	float position_next[3];
-	float projection[3];
-	for (int i = 0; i < 3; i++)
-		projection[i] = pos[i] - position[i];
-	for (int i = 0; i < 3; i++)
-		position_next[i] = next_pos[i] - position[i];
-
-	//if original point is on one side, moved point is on the other, apply correction
-	float dot_before = projection[0] * normal[0] + projection[1] * normal[1] + projection[2] * normal[2];
-	float dot_after = position_next[0] * normal[0] + position_next[1] * normal[1] + position_next[2] * normal[2];
-
-	float speed_component = speed[0] * normal[0] + speed[1] * normal[1] + speed[2] * normal[2];
-
-	//if the current speed direction leads us to intersect the model
-	if (dot_before/delta < -speed_component)
-	{
-		//reflect of the plane
-		for (int i = 0; i < 3; i++)
-			speed[i] -= 2 * speed_component*normal[i];
-
-		//move the particle back over the boundary
-		for (int i = 0; i < 3; i++)
+		//check if we're inside the triangle
+		if (in_triangle(intersection_point, tri_a, tri_b, tri_c))
 		{
-			next_pos[i] -= normal[i] * (dot_after +0.01);
-			pos[i] -= normal[i] * (dot_after + 0.01);
-		}
+			float perpendicular_component = dot(velocity, normal);
 
-		return true;
+			//reflect of the plane
+			float impulse[3];
+			multiply(normal, -2 * perpendicular_component, impulse);
+			add(velocity, impulse, velocity);
+
+			//move the particle back over the boundary
+			multiply(impulse, delta, impulse);
+			add(intersection_point, impulse, intersection_point);
+			set(next_pos, intersection_point);
+
+			return true;
+		}
+		return false;
 	}
 	return false;
 }
@@ -718,7 +712,8 @@ extern "C" __device__  void collisions(float* speed, float* pos, float* next_pos
 
 	int counter = grid_index * BLOCK_SIZE;
 	int offset = collide_grid[counter] - 1;; //start with the block allocated for this grid cell
-	while (offset > 0)
+	//offset = 0;
+	while (offset < 12)
 	{
 		//check all the neighbouring particles in this 
 		float* collide_tri_pos = &collide_data[offset * 3 * 4];
@@ -727,16 +722,15 @@ extern "C" __device__  void collisions(float* speed, float* pos, float* next_pos
 		float* collide_tri_dir_b = collide_tri_pos + 9;
 
 		triCollide(collide_tri_norm, collide_tri_pos, collide_tri_dir_a, collide_tri_dir_b,
-			speed, transformed_pos, transformed__next_pos, delta, offset);
+			speed, transformed_pos, transformed__next_pos, delta);
 
-		
+
 		//move onto next pos
 		counter++;
 		//if we reach the endof a block, usre the referenceto the next omne
 		if (counter % BLOCK_SIZE == BLOCK_SIZE - 1)
 			counter = (collide_grid[counter] * BLOCK_SIZE);
 		offset = collide_grid[counter] - 1;
-		
 	}
 	for (int i = 0; i < 3; i++)
 	{

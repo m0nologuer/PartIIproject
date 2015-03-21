@@ -65,7 +65,7 @@ void display(void)
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-// 	glTranslatef(0., 0.1f, 0.f);
+	glRotatef(c_loader.angle*0.1, 0., 0.f, 1.f);
 
 	// rotate it around the y axis
 	GLfloat matrix[16];
@@ -87,7 +87,7 @@ void display(void)
 		glEndList();
 	}
 
-//	glCallList(scene_list);
+	glCallList(scene_list);
 
 	p_container.DrawPoints();
 
