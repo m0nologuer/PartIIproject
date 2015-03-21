@@ -302,7 +302,7 @@ int ColladaLoader::loadasset(const char* path)
 		tmp = std::max(scene_max.z - scene_min.z, tmp);
 		tmp = 40.0f/tmp;
 		aiMatrix4x4 matrix = aiMatrix4x4(aiVector3D(tmp, tmp, tmp), aiQuaternion(), aiVector3D(0,0,0));
-		matrix *= aiMatrix4x4(aiVector3D(1, 1, 4), aiQuaternion(aiVector3D(0,0,1),3.1416*0), -scene_center/tmp + aiVector3D(0,0,-20)/tmp);
+		matrix *= aiMatrix4x4(aiVector3D(1, 1, 4), aiQuaternion(aiVector3D(0,0,1),3.1416*0.25), -scene_center/tmp + aiVector3D(0,0,-15)/tmp);
 		applyMatrix(scene, scene->mRootNode, matrix);
 
 		return 0;

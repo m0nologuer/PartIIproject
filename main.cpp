@@ -65,7 +65,7 @@ void display(void)
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-	glRotatef(c_loader.angle*0.1, 0., 0.f, 1.f);
+	//glRotatef(c_loader.angle*0.1, 0., 0.f, 1.f);
 
 	// rotate it around the y axis
 	GLfloat matrix[16];

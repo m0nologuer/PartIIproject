@@ -620,41 +620,34 @@ extern "C" __device__  void set(float* p, float* q)
 	for (int i = 0; i < 3; i++)
 		q[i] = p[i];
 }
+extern "C" __device__  bool same_side(float* p1, float* p2, float* a, float* b)
+{
+	float bMinusA[3];
+	float p1MinusA[3];
+	float p2MinusA[3];
+
+	subtract(b, a, bMinusA);
+	subtract(p1, a, p1MinusA);
+	subtract(p2, a, p2MinusA);
+
+	float cp1[3];
+	float cp2[3];
+
+	cross(bMinusA, p1MinusA, cp1);
+	cross(bMinusA, p2MinusA, cp2);
+
+	if (dot(cp1, cp2) >= 0)
+		return true;
+	else
+		return false;
+}
 extern "C" __device__  bool in_triangle(float* p, float* p0, float* p1, float* p2)
 {
-	// Compute vectors
-	float v0[3];
-	float v1[3];
-	float v2[3];
-	for (int i = 0; i < 3; i++)
-	{
-		v0[i] = p2[i] - p0[i];
-		v1[i] = p1[i] - p0[i];
-	}
-	//normal vector
-	float n[3];
-	cross(v0, v1, n);
-	float d = (p[0] - p0[0])*n[0] + (p[1] - p0[1])*n[1] + (p[2] - p0[2])*n[2];
-
-	for (int i = 0; i < 3; i++)
-	{
-		v2[i] = (p[i] - d*n[i]) - p0[i];
-	}
-
-	// Compute dot products
-	float dot00 = dot(v0, v0);
-	float dot01 = dot(v0, v1);
-	float dot02 = dot(v0, v2);
-	float dot11 = dot(v1, v1);
-	float dot12 = dot(v1, v2);
-
-	// Compute barycentric coordinates
-	float denom = (dot00 * dot11 - dot01 * dot01);
-	float u = (dot11 * dot02 - dot01 * dot12);
-	float v = (dot00 * dot12 - dot01 * dot02) ;
-	
-	// Check if point is in triangle
-	return (u >= 0) && (v >= 0) && (u + v < denom);
+	if (same_side(p, p0, p1, p2) && same_side(p, p1, p2, p0)
+		&& same_side(p, p2, p0, p1))
+		return true;
+	else
+		return false;
 }
 extern "C" __device__  bool triCollide(float* normal, float* tri_a, float* tri_b, float* tri_c,
 	float* velocity, float* pos, float* next_pos, float delta)
@@ -673,25 +666,20 @@ extern "C" __device__  bool triCollide(float* normal, float* tri_a, float* tri_b
 		lerp(pos, next_pos, interpolation, intersection_point);
 
 		//check if we're inside the triangle
-		if (in_triangle(intersection_point, tri_a, tri_b, tri_c))
-		{
-			float perpendicular_component = dot(velocity, normal);
-			 
-			//reflect of the plane
-			float impulse[3];
-			multiply(normal, -2 * perpendicular_component, impulse);
-			add(velocity, impulse, velocity);
-			subtract(velocity, velocity, velocity);
-
-			/*
+		if (in_triangle(intersection_point, tri_a, intersection_point, tri_c))
+		{			
 			//move the particle back over the boundary
 			float movement_vector[3];
+			float impulse[3];
 			subtract(next_pos, pos, movement_vector);
 			float interval_distance = sqrt(dot(movement_vector, movement_vector));
 			multiply(velocity, (1 - interpolation)*interval_distance, impulse);
-			add(intersection_point, impulse, intersection_point);
-			set(next_pos, intersection_point);
-			*/
+			add(next_pos, impulse, next_pos);
+			
+			//reflect of the plane
+			float perpendicular_component = dot(velocity, normal);
+			multiply(normal, -2 * perpendicular_component, impulse);
+			add(velocity, impulse, velocity);
 
 			return true;
 		}
