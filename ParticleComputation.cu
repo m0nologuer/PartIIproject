@@ -609,10 +609,8 @@ extern "C" __device__  float lineplane(float* plane_pos, float* normal, float* s
 {
 	float p1p3[3];
 	float p2p3[3];
-	multiply(plane_pos, -1, p1p3);
-	multiply(end_pos, -1, p2p3);
-	add(p2p3, start_pos, p2p3);
-	add(p1p3, start_pos, p1p3);
+	subtract(plane_pos, start_pos, p1p3);
+	subtract(end_pos, start_pos, p2p3);
 
 	float u = dot(normal, p1p3) / dot(normal, p2p3);
 	return u;
@@ -661,7 +659,6 @@ extern "C" __device__  bool in_triangle(float* p, float* p0, float* p1, float* p
 extern "C" __device__  bool triCollide(float* normal, float* tri_a, float* tri_b, float* tri_c,
 	float* velocity, float* pos, float* next_pos, float delta)
 {
-
 	float vector_before[3];
 	float vector_after[3];
 	subtract(pos, tri_a, vector_before);
@@ -676,7 +673,7 @@ extern "C" __device__  bool triCollide(float* normal, float* tri_a, float* tri_b
 		lerp(pos, next_pos, interpolation, intersection_point);
 
 		//check if we're inside the triangle
-		if (true|| in_triangle(intersection_point, tri_a, tri_b, tri_c))
+		if (in_triangle(intersection_point, tri_a, tri_b, tri_c))
 		{
 			float perpendicular_component = dot(velocity, normal);
 
@@ -732,7 +729,8 @@ extern "C" __device__  void collisions(float* speed, float* pos, float* next_pos
 
 	int counter = grid_index * BLOCK_SIZE;
 	int offset = collide_grid[counter] - 1;; //start with the block allocated for this grid cell
-	while (offset > 0)
+	offset = 0;
+	while (offset < 12)
 	{
 		//check all the neighbouring particles in this 
 		float* collide_tri_pos = &collide_data[offset * 3 * 4];
@@ -744,13 +742,15 @@ extern "C" __device__  void collisions(float* speed, float* pos, float* next_pos
 			speed, transformed_pos, transformed__next_pos, delta))
 			break;
 
+		offset++;
+		/*
 		//move onto next pos
 		counter++;
 		//if we reach the endof a block, usre the referenceto the next omne
 		if (counter % BLOCK_SIZE == BLOCK_SIZE - 1)
 			counter = (collide_grid[counter] * BLOCK_SIZE);
 		offset = collide_grid[counter] - 1;
-		
+		*/
 	}
 	for (int i = 0; i < 3; i++)
 	{
