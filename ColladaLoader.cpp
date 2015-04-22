@@ -140,7 +140,9 @@ float* ColladaLoader::data(int& block_size){
 
 		aiVector3D dir1_v = vertices[i + 2] - vertices[i];
 		aiVector3D dir2_v = vertices[i + 1] - vertices[i];
-		aiVector3D normal_v = dir1_v.SymMul(dir2_v);
+		aiVector3D normal_v(dir1_v.z*dir2_v.y - dir1_v.y*dir2_v.z,
+			dir1_v.x*dir2_v.z - dir1_v.z*dir2_v.x,
+			dir1_v.y*dir2_v.x - dir1_v.x*dir2_v.y);
 		normal_v.Normalize();
 		normal[0] = normal_v.x;
 		normal[1] = normal_v.y;
@@ -153,20 +155,6 @@ float* ColladaLoader::data(int& block_size){
 		pos_b[0] = vertices[i + 2].x;
 		pos_b[1] = vertices[i + 2].y;
 		pos_b[2] = vertices[i + 2].z;
-
-
-		/*
-		dir1_v *= 1.0f / dir1_v.SquareLength();
-		dir2_v *= 1.0f / dir2_v.SquareLength();
-
-		dir1[0] = dir1_v.x;
-		dir1[1] = dir1_v.y;
-		dir1[2] = dir1_v.z;
-
-		dir2[0] = dir2_v.x;
-		dir2[1] = dir2_v.y;
-		dir2[2] = dir2_v.z;
-		*/
 
 		data_blob += 12;
 	}
@@ -301,8 +289,8 @@ int ColladaLoader::loadasset(const char* path)
 		tmp = std::max(scene_max.y - scene_min.y, tmp);
 		tmp = std::max(scene_max.z - scene_min.z, tmp);
 		tmp = 40.0f/tmp;
-		aiMatrix4x4 matrix = aiMatrix4x4(aiVector3D(tmp, tmp, tmp), aiQuaternion(), aiVector3D(0,0,0));
-		matrix *= aiMatrix4x4(aiVector3D(1, 1, 4), aiQuaternion(aiVector3D(0,0,1),3.1416*0.25), -scene_center/tmp + aiVector3D(0,0,-15)/tmp);
+		aiMatrix4x4 matrix = aiMatrix4x4(aiVector3D(tmp, tmp, tmp), aiQuaternion(aiVector3D(0, 0, 1), 3.1416*0.1), aiVector3D(0, 0, 0));
+		matrix *= aiMatrix4x4(aiVector3D(1, 1, 1), aiQuaternion(), -scene_center / tmp - aiVector3D(0, 0., 0));
 		applyMatrix(scene, scene->mRootNode, matrix);
 
 		return 0;

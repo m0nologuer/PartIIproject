@@ -45,18 +45,15 @@ void ParticleContainer::CUDAloop(double delta)
 
 #else
 #ifdef ATOMIC_METHOD
-	//findNeighboursAtomic_CUDA(delta);
+	findNeighboursAtomic_CUDA(delta);
 #else
 	findNeighbours_CUDA(delta);
 #endif
 #endif
 
 	//Perform collision detection, solving
-//	solverIterations_CUDA(delta);
+	solverIterations_CUDA(delta);
 	RECORD_SPEED("	CUDA solver iteraions  %d ms \n");
-
-	mem_size = sizeof(float) * MAX_PARTICLE_COUNT;
-	gpuErrchk(cudaMemcpy(lambdas_array, particle_lambdas_CUDA, mem_size, cudaMemcpyDeviceToHost));
 
 }
 extern "C" __device__ float W_poly6_cuda(Particle::vec3 r, float h)
@@ -649,6 +646,50 @@ extern "C" __device__  bool in_triangle(float* p, float* p0, float* p1, float* p
 	else
 		return false;
 }
+extern "C" __device__  bool sphereCollide(float radius, float* center, float* normal,
+	float* velocity, float* pos, float* next_pos, float delta)
+{
+	float vector_before[3];
+	float vector_after[3];
+	subtract(pos, center, vector_before);
+	subtract(next_pos, center, vector_after);
+	float before_dist = dot(vector_before, vector_before);
+	float after_dist = dot(vector_after, vector_after);
+
+	//if particle position before and after the timestep are on opposite sides of the sphere 
+	if ((before_dist - radius)* (after_dist - radius) < 0)
+	{
+		//calculate intersection point
+		float intersection_point[3];
+		float interpolation = (radius - before_dist) / (after_dist - before_dist);
+		lerp(pos, next_pos, interpolation, intersection_point);
+
+		//check if we're inside the bottom half of the bowl
+		if (dot(intersection_point, normal) < 0)
+		{
+			//figure out which direction to relfect
+			float reflectance_dir[3];
+			subtract(center, intersection_point, reflectance_dir);
+
+			//reflect of the surface
+			float impulse[3];
+			float perpendicular_component = dot(velocity, reflectance_dir);
+			multiply(reflectance_dir, -2 * perpendicular_component, impulse);
+			add(velocity, impulse, velocity);
+
+			//move the particle back over the boundary
+			float movement_vector[3];
+			subtract(next_pos, pos, movement_vector);
+			float interval_distance = sqrt(dot(movement_vector, movement_vector));
+			multiply(velocity, (1 - interpolation)*interval_distance, impulse);
+			add(next_pos, impulse, next_pos);
+
+			return true;
+		}
+		return false;
+	}
+	return false;
+}
 extern "C" __device__  bool triCollide(float* normal, float* tri_a, float* tri_b, float* tri_c,
 	float* velocity, float* pos, float* next_pos, float delta)
 {
@@ -666,20 +707,20 @@ extern "C" __device__  bool triCollide(float* normal, float* tri_a, float* tri_b
 		lerp(pos, next_pos, interpolation, intersection_point);
 
 		//check if we're inside the triangle
-		if (in_triangle(intersection_point, tri_a, intersection_point, tri_c))
+		if (in_triangle(intersection_point, tri_a, tri_b, tri_c))
 		{			
+			//reflect of the plane
+			float impulse[3];
+			float perpendicular_component = dot(velocity, normal);
+			multiply(normal, -2 * perpendicular_component, impulse);
+			add(velocity, impulse, velocity);
+
 			//move the particle back over the boundary
 			float movement_vector[3];
-			float impulse[3];
 			subtract(next_pos, pos, movement_vector);
 			float interval_distance = sqrt(dot(movement_vector, movement_vector));
 			multiply(velocity, (1 - interpolation)*interval_distance, impulse);
 			add(next_pos, impulse, next_pos);
-			
-			//reflect of the plane
-			float perpendicular_component = dot(velocity, normal);
-			multiply(normal, -2 * perpendicular_component, impulse);
-			add(velocity, impulse, velocity);
 
 			return true;
 		}
@@ -693,6 +734,7 @@ extern "C" __device__  void collisions(float* speed, float* pos, float* next_pos
 {	
 	float transformed_pos[] = { 0, 0, 0 };
 	float transformed__next_pos[] = { 0, 0, 0 };
+	float transformed__velocity[] = { 0, 0, 0 };
 
 	for (int i = 0; i < 3; i++)
 	{
@@ -700,6 +742,7 @@ extern "C" __device__  void collisions(float* speed, float* pos, float* next_pos
 		{
 			transformed_pos[i] += matrix[4 * i + j] * pos[j];
 			transformed__next_pos[i] += matrix[4 * i + j] * next_pos[j];
+			transformed__velocity[i] += matrix[4 * i + j] * speed[j];
 		}
 
 
@@ -723,7 +766,7 @@ extern "C" __device__  void collisions(float* speed, float* pos, float* next_pos
 	int counter = grid_index * BLOCK_SIZE;
 	int offset = collide_grid[counter] - 1;; //start with the block allocated for this grid cell
 	offset = 0;
-	while (offset < 12)
+	while (offset < 1)
 	{
 		//check all the neighbouring particles in this 
 		float* collide_tri_pos = &collide_data[offset * 3 * 4];
@@ -731,8 +774,14 @@ extern "C" __device__  void collisions(float* speed, float* pos, float* next_pos
 		float* collide_tri_dir_a = collide_tri_pos + 6;
 		float* collide_tri_dir_b = collide_tri_pos + 9;
 
-		(triCollide(collide_tri_norm, collide_tri_pos, collide_tri_dir_a, collide_tri_dir_b,
-			speed, transformed_pos, transformed__next_pos, delta));
+		float open_vec[3];
+		open_vec[0] = 0;
+		open_vec[1] = 1;
+		open_vec[2] = 0;
+
+		if (dot(collide_tri_norm,open_vec) > - 0.5)
+			triCollide(collide_tri_norm, collide_tri_pos, collide_tri_dir_a, collide_tri_dir_b,
+				transformed__velocity, transformed_pos, transformed__next_pos, delta);
 
 		offset++;
 		/*
@@ -744,6 +793,7 @@ extern "C" __device__  void collisions(float* speed, float* pos, float* next_pos
 		offset = collide_grid[counter] - 1;
 		*/
 	}
+	
 	for (int i = 0; i < 3; i++)
 	{
 		transformed_pos[i] -= matrix[4 * i + 4];
@@ -751,11 +801,13 @@ extern "C" __device__  void collisions(float* speed, float* pos, float* next_pos
 
 		pos[i] = 0;
 		next_pos[i] = 0;
+		speed[i] = 0;
 
 		for (int j = 0; j < 3; j++)
 		{
 			pos[i] += matrix[4 * j + i] * transformed_pos[j];
 			next_pos[i] += matrix[4 * j + i] * transformed__next_pos[j];
+			speed[i] += matrix[4 * j + i] * transformed__velocity[j];
 		}
 
 	}
@@ -843,13 +895,13 @@ extern "C" __global__ void updateParticles(float delta, float *pos, float* predi
 				pos[3 * i + 2] = sin(phi)*cos(theta) * 10;
 
 				speed[3 * i] =  ((scramble * i) % 100 - 100) * 0.1;
-				speed[3 * i + 1] =  -(scramble * i * i * i) % 100 - 150;
+				speed[3 * i + 1] =  -(scramble * i * i * i) % 100 - 50;
 				speed[3 * i + 2] = ((scramble * i * i) % 100 - 50) * 0.1;
 
 				for (int j = 0; j < 3; j++)
 					predicted_pos[3 * i + j] = pos[3 * i + j] + speed[3 * i + j] * delta;
 
-				life[i] = 0.6f; //lasts 5 second
+				life[i] = 1.0f; //lasts 5 second
 			}
 		}
 	}
@@ -1120,7 +1172,7 @@ void ParticleContainer::findNeighboursAtomic_CUDA(float delta)
 	{
 		// Launch the CUDA Kernel for lambdas
 		solverIterationLambdas << <blocksPerGrid, threadsPerBlock >> >(particle_predicted_pos_CUDA,
-			particle_life_CUDA, particle_speeds_CUDA, particle_lambdas_CUDA, neighbours_CUDA, 0.5, 15, 0.1);
+			particle_life_CUDA, particle_speeds_CUDA, particle_lambdas_CUDA, neighbours_CUDA, 0.05, 15, 0.1);
 
 		//Error handling
 		gpuErrchk(cudaDeviceSynchronize());
@@ -1128,7 +1180,7 @@ void ParticleContainer::findNeighboursAtomic_CUDA(float delta)
 
 		// Launch the CUDA Kernel for positions
 		solverIterationPositions << <blocksPerGrid, threadsPerBlock >> >(particle_predicted_pos_CUDA,
-			particle_life_CUDA, particle_lambdas_CUDA, neighbours_CUDA, 15, 0.0121611953, 0.1, 0.5, 4);
+			particle_life_CUDA, particle_lambdas_CUDA, neighbours_CUDA, 15, 0.0121611953, 0.1, 0.05, 4);
 		//Error handling
 		gpuErrchk(cudaDeviceSynchronize());
 		gpuErrchk(cudaGetLastError());

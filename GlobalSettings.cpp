@@ -35,7 +35,7 @@ float GlobalSettings::getConstant(char* name)
 }
 char* GlobalSettings::getAssetLocation(char* name)
 {
-	char* s = new char[256];
+	char* s = new char[256]; 
 	char* string = (char*)root["assets"][name].asCString();
 
 	if (string)

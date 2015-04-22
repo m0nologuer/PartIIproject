@@ -141,6 +141,7 @@ void ParticleContainer::UpdateParticles(double delta)
 	if (settings.use_CUDA)
 	{
 		CUDAloop(delta);
+		SPACE();
 		render_counter = max_particle_count;
 	}
 	else{
